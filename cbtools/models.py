@@ -1,7 +1,4 @@
-import logging
-import traceback
 from sqlalchemy import create_engine, func, UniqueConstraint, Boolean
-from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, DateTime, Integer, Numeric, String
@@ -14,6 +11,24 @@ engine = create_engine(DEV_URI)
 session = scoped_session(sessionmaker(autocommit=True, autoflush=True, bind=engine))
 Base = declarative_base()
 Base.query = session.query_property()
+
+
+class ReconciliationExceptions(Base):
+    __tablename__ = 'reconciliation_exceptions'
+    __table_args__ = (UniqueConstraint('record_id', 'column_name', name='rec_exception_constraint'),)
+
+    id = Column(Integer, primary_key=True)
+    table_name = Column(String)
+    record_id = Column(String)
+    column_name = Column(String)
+    cbtools_version = Column(String)
+    coinbase_version = Column(String)
+    json_doc = Column(Boolean)
+    resolved = Column(Boolean, default=False)
+    resolution = Column(String, default=None)
+
+    timestamp = Column(DateTime(timezone=True), default=func.now())
+    resolved_timestamp = Column(DateTime(timezone=True))
 
 
 class Users(Base):
@@ -57,6 +72,7 @@ class Addresses(Base):
     __tablename__ = 'addresses'
 
     id = Column(String, primary_key=True)
+    account_id = Column(String)
     address = Column(String)
     name = Column(String)
     created_at = Column(DateTime(timezone=True))
