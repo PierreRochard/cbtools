@@ -19,7 +19,10 @@ def update_transactions(account_id, transactions):
     pass
 
 
-def update_exchanges(account_id, exchanges):
+def update_exchanges(account_id, exchange_type, exchanges):
+    pass
+
+def update_payment_methods(payment_methods):
     pass
 
 
@@ -43,12 +46,20 @@ def update_database(api_key, api_secret):
         update_transactions(account['id'], transactions)
 
         buys = client.get_buys(account['id'])['data']
-        update_exchanges(account['id'], buys)
+        update_exchanges(account['id'], 'buy', buys)
 
         sells = client.get_sells(account['id'])['data']
-        update_exchanges(account['id'], sells)
+        update_exchanges(account['id'], 'sell', sells)
 
-        # deposits = client.get_deposits()
+        deposits = client.get_deposits(account['id'])['data']
+        update_exchanges(account['id'], 'deposit', deposits)
+
+        withdrawals = client.get_withdrawals(account['id'])['data']
+        update_exchanges(account['id'], 'withdrawal', withdrawals)
+
+        payment_methods = client.get_payment_methods()
+        update_payment_methods(payment_methods)
+
 
 if __name__ == '__main__':
     from config import COINBASE_KEY, COINBASE_SECRET
