@@ -242,6 +242,7 @@ def update_transaction(account_id, transaction):
     new_transaction.amount_currency = transaction['amount']['currency']
     new_transaction.native_amount = Decimal(transaction['native_amount']['amount'])
     new_transaction.native_amount_currency = transaction['native_amount']['currency']
+    new_transaction.transaction_type = transaction.pop('type')
     if 'network' in transaction:
         new_transaction.network_status = transaction['network']['status']
         if 'hash' in transaction['network']:
@@ -276,6 +277,23 @@ def update_transaction(account_id, transaction):
         setattr(new_transaction, timestamp, parse(transaction.pop(timestamp)).astimezone(tzlocal()))
     for key in ['resource', 'resource_path', 'amount', 'native_amount']:
         del transaction[key]
+    if 'fiat_deposit' in transaction:
+        new_transaction.exchange_id = transaction['fiat_deposit']['id']
+        del transaction['fiat_deposit']
+    elif 'fiat_withdrawal' in transaction:
+        new_transaction.exchange_id = transaction['fiat_withdrawal']['id']
+        del transaction['fiat_withdrawal']
+    elif 'buy' in transaction:
+        new_transaction.exchange_id = transaction['buy']['id']
+        del transaction['buy']
+    elif 'sell' in transaction:
+        new_transaction.exchange_id = transaction['sell']['id']
+        del transaction['sell']
+    if 'order' in transaction:
+        print(pformat(transaction))
+        raise
+    if 'idem' in transaction:
+        del transaction['idem']
     for key in transaction:
         if hasattr(new_transaction, key):
             if isinstance(transaction[key], dict):
@@ -338,6 +356,8 @@ def update_transaction(account_id, transaction):
     except ProgrammingError:
         session.rollback()
         db_logger.error('Add Transaction ProgrammingError')
+        print(pformat(transaction))
+        raise
 
 
 def update_exchanges(account_id, exchange_type, exchanges):

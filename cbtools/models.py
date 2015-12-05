@@ -93,6 +93,7 @@ class Transactions(Base):
     __tablename__ = 'transactions'
 
     id = Column(String, primary_key=True)
+    exchange_id = Column(String)
     transaction_type = Column(String)
     status = Column(String)
     amount = Column(Numeric)
