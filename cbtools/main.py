@@ -15,9 +15,73 @@ from cbtools.utilities import dict_compare
 
 
 def update_user(user):
-    print(pformat(user))
-
-    pass
+    new_user = Users()
+    new_user.document = json.loads(str(user))
+    new_user.country_code = user['country']['code']
+    new_user.country_name = user['country']['name']
+    del user['country']
+    for key in user:
+        if hasattr(new_user, key):
+            if isinstance(user[key], dict):
+                setattr(new_user, key, json.loads(str(user[key])))
+            else:
+                setattr(new_user, key, user[key])
+        else:
+            db_logger.error('{0} is missing from Users table, see {1}'.format(key, user['id']))
+            continue
+    session.add(new_user)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        existing_user = session.query(Users).filter(Users.id == new_user.id).one()
+        for column in inspect(Users).attrs:
+            cbtools_version = getattr(existing_user, column.key)
+            service_version = getattr(new_user, column.key)
+            is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
+            if is_dict and cbtools_version != service_version:
+                added, removed, modified, same = dict_compare(service_version, cbtools_version)
+                if not added and not removed and not modified:
+                    continue
+                else:
+                    new_exception = ReconciliationExceptions()
+                    new_exception.table_name = 'Users'
+                    new_exception.record_id = existing_user.id
+                    new_exception.column_name = column.key
+                    new_exception.cbtools_version = cbtools_version
+                    new_exception.service_version = service_version
+                    new_exception.json_doc = True
+                    session.add(new_exception)
+                    try:
+                        session.commit()
+                    except IntegrityError:
+                        session.rollback()
+                        db_logger.warn('Commit New Reconciliation Exception IntegrityError')
+                    except ProgrammingError:
+                        session.rollback()
+                        db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+            elif cbtools_version == service_version:
+                continue
+            elif str(cbtools_version) != str(service_version):
+                new_exception = ReconciliationExceptions()
+                new_exception.table_name = 'Users'
+                new_exception.record_id = existing_user.id
+                new_exception.column_name = column.key
+                new_exception.cbtools_version = cbtools_version
+                new_exception.service_version = service_version
+                new_exception.json_doc = False
+                session.add(new_exception)
+                try:
+                    session.commit()
+                except IntegrityError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception IntegrityError')
+                except ProgrammingError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+    except ProgrammingError:
+        session.rollback()
+        db_logger.error('Add User ProgrammingError')
 
 
 def update_account(account):
@@ -60,10 +124,10 @@ def update_account(account):
                     continue
                 else:
                     new_exception = ReconciliationExceptions()
-                    new_exception.table_name = 'accounts'
+                    new_exception.table_name = 'Accounts'
                     new_exception.record_id = existing_account.id
                     new_exception.column_name = column.key
-                    new_exception.pacioli_version = cbtools_version
+                    new_exception.cbtools_version = cbtools_version
                     new_exception.service_version = service_version
                     new_exception.json_doc = True
                     session.add(new_exception)
@@ -79,10 +143,10 @@ def update_account(account):
                 continue
             elif str(cbtools_version) != str(service_version):
                 new_exception = ReconciliationExceptions()
-                new_exception.table_name = 'accounts'
+                new_exception.table_name = 'Accounts'
                 new_exception.record_id = existing_account.id
                 new_exception.column_name = column.key
-                new_exception.pacioli_version = cbtools_version
+                new_exception.cbtools_version = cbtools_version
                 new_exception.service_version = service_version
                 new_exception.json_doc = False
                 session.add(new_exception)
@@ -100,6 +164,7 @@ def update_account(account):
 
 
 def update_addresses(account_id, addresses):
+    print(pformat(addresses))
     pass
 
 
@@ -130,7 +195,7 @@ def update_database(api_key, api_secret):
         update_account(account)
         addresses = client.get_addresses(account['id'])['data']
         update_addresses(account['id'], addresses)
-        # print(pformat(addresses))
+        continue
 
         transactions = client.get_transactions(account['id'])['data']
         update_transactions(account['id'], transactions)
