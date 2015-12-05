@@ -7,10 +7,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-from config import DEV_URI
+from config import URI
 
 
-engine = create_engine(DEV_URI)
+engine = create_engine(URI)
 
 session = scoped_session(sessionmaker(autocommit=True, autoflush=True, bind=engine))
 Base = declarative_base()
