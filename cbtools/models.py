@@ -107,8 +107,11 @@ class Transactions(Base):
     network_hash = Column(String)
     to_resource = Column(String)
     to_address = Column(String)
+    to_user_id = Column(String)
+    to_email = Column(String)
     from_resource = Column(String)
     from_address = Column(String)
+    from_user_id = Column(String)
     address = Column(String)
     application = Column(String)
 
@@ -204,5 +207,5 @@ class SQLAlchemyLogHandler(logging.Handler):
 
 
 if __name__ == "__main__":
-    # Base.metadata.drop_all(bind=engine)
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
