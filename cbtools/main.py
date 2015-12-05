@@ -8,6 +8,7 @@ from dateutil.tz import tzlocal
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
+from cbtools import db_logger
 from cbtools.models import (session, Users, Accounts, Addresses, Transactions,
                             Exchanges, PaymentMethods, ReconciliationExceptions)
 from cbtools.utilities import dict_compare
@@ -30,6 +31,10 @@ def update_account(account):
     del account['native_balance']
     new_account.created_at = parse(account.pop('created_at')).astimezone(tzlocal())
     new_account.updated_at = parse(account.pop('updated_at')).astimezone(tzlocal())
+    new_account.account_type = account['type']
+    del account['type']
+    del account['resource']
+    del account['resource_path']
     for key in account:
         if hasattr(new_account, key):
             if isinstance(account[key], dict):
@@ -37,7 +42,7 @@ def update_account(account):
             else:
                 setattr(new_account, key, account[key])
         else:
-            logger.error('{0} is missing from Coinbase Accounts table, see {1}'.format(key, account['id']))
+            db_logger.error('{0} is missing from Accounts table, see {1}'.format(key, account['id']))
             continue
     session.add(new_account)
     try:
@@ -66,9 +71,10 @@ def update_account(account):
                         session.commit()
                     except IntegrityError:
                         session.rollback()
-                        logger.warn('Commit New Reconciliation Exception IntegrityError')
+                        db_logger.warn('Commit New Reconciliation Exception IntegrityError')
                     except ProgrammingError:
-                        logger.error('Commit New Reconciliation Exception ProgrammingError')
+                        session.rollback()
+                        db_logger.error('Commit New Reconciliation Exception ProgrammingError')
             elif cbtools_version == service_version:
                 continue
             elif str(cbtools_version) != str(service_version):
@@ -84,12 +90,13 @@ def update_account(account):
                     session.commit()
                 except IntegrityError:
                     session.rollback()
-                    logger.error('Commit New Reconciliation Exception IntegrityError')
+                    db_logger.error('Commit New Reconciliation Exception IntegrityError')
                 except ProgrammingError:
-                    logger.error('Commit New Reconciliation Exception ProgrammingError')
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception ProgrammingError')
     except ProgrammingError:
         session.rollback()
-        logger.error('Add Coinbase Account ProgrammingError')
+        db_logger.error('Add Account ProgrammingError')
 
 
 def update_addresses(account_id, addresses):
@@ -113,7 +120,6 @@ def update_database(api_key, api_secret):
 
     current_user = client.get_current_user()
     update_user(current_user)
-    return
     # print(pformat(current_user))
 
     accounts = client.get_accounts()['data']
