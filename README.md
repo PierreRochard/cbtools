@@ -1,7 +1,8 @@
 
 
-Create a config.py file in the current directory with the following parameters:
-<code>
+1. Create a config.py file in the current directory with the following parameters:
+
+```
 COINBASE_KEY = ''
 COINBASE_SECRET = ''
 
@@ -12,4 +13,4 @@ PG_PORT = 5432
 PG_DB = 'cbtools'
 
 URI = 'postgresql+psycopg2://{0}:{1}@{2}:{3}/{4}'.format(PG_USERNAME, PG_PASSWORD, PG_HOST, PG_PORT, PG_DB)
-</code>
+```
