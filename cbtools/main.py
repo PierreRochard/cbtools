@@ -367,11 +367,11 @@ def update_transaction(account_id, transaction):
         raise
 
 
-def update_exchanges(account_id, exchange_type, exchanges):
+def update_exchange(account_id, exchange):
     pass
 
 
-def update_payment_methods(payment_methods):
+def update_payment_method(payment_method):
     pass
 
 
@@ -385,47 +385,27 @@ def update_database(api_key, api_secret):
 
     for account in accounts:
         update_account(account)
-        addresses = client.get_addresses(account['id'])
-        while addresses.pagination['next_uri']:
-            addresses_data = addresses['data']
-            for address in addresses_data:
-                update_address(account['id'], address)
-            starting_after = addresses.pagination['next_uri'].split('=')[-1]
-            addresses = client.get_addresses(account['id'], starting_after=starting_after)
-        else:
-            addresses_data = addresses['data']
-            for address in addresses_data:
-                update_address(account['id'], address)
+        for method, function in [('get_addresses', 'update_address'),
+                                  ('get_transactions', 'update_transaction'),
+                                  # ('get_buys', 'update_exchange'),
+                                  # ('get_sells', 'update_exchange'),
+                                  # ('get_deposits', 'update_exchange'),
+                                  # ('get_withdrawals', 'update_exchange')
+                                 ]:
+            response = getattr(client, method)(account['id'])
+            while response.pagination['next_uri']:
+                data = response['data']
+                for datum in data:
+                    globals()[function](account['id'], datum)
+                starting_after = response.pagination['next_uri'].split('=')[-1]
+                response = getattr(client, method)(account['id'], starting_after=starting_after)
+            else:
+                data = response['data']
+                for datum in data:
+                    globals()[function](account['id'], datum)
 
-        transactions = client.get_transactions(account['id'])
-        while transactions.pagination['next_uri']:
-            transactions_data = transactions['data']
-            for transaction in transactions_data:
-                update_transaction(account['id'], transaction)
-            starting_after = transactions.pagination['next_uri'].split('=')[-1]
-            transactions = client.get_transactions(account['id'], starting_after=starting_after)
-        else:
-            transactions_data = transactions['data']
-            for transaction in transactions_data:
-                update_transaction(account['id'], transaction)
-        continue
-
-
-
-        buys = client.get_buys(account['id'])['data']
-        update_exchanges(account['id'], 'buy', buys)
-
-        sells = client.get_sells(account['id'])['data']
-        update_exchanges(account['id'], 'sell', sells)
-
-        deposits = client.get_deposits(account['id'])['data']
-        update_exchanges(account['id'], 'deposit', deposits)
-
-        withdrawals = client.get_withdrawals(account['id'])['data']
-        update_exchanges(account['id'], 'withdrawal', withdrawals)
-
-    payment_methods = client.get_payment_methods()
-    update_payment_methods(payment_methods)
+    # payment_methods = client.get_payment_methods()
+    # update_payment_methods(payment_methods)
 
 
 if __name__ == '__main__':
