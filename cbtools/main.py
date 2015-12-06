@@ -475,6 +475,8 @@ def update_fee(source_id, fee):
         existing_fee = session.query(Fees).filter(Fees.source_id == new_record.source_id,
                                                        Fees.fee_type == new_record.fee_type).one()
         for column in inspect(Fees).attrs:
+            if column.key == 'id':
+                continue
             cbtools_version = getattr(existing_fee, column.key)
             service_version = getattr(new_record, column.key)
             is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
@@ -641,6 +643,8 @@ def update_limits(payment_method_id, limits):
                                           Limits.limit_type == new_record.limit_type,
                                           Limits.period_in_days == new_record.period_in_days).one())
                 for column in inspect(Limits).attrs:
+                    if column.key == 'id':
+                        continue
                     cbtools_version = getattr(existing_limit, column.key)
                     service_version = getattr(new_record, column.key)
                     is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
