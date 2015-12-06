@@ -145,6 +145,7 @@ class Exchanges(Base):
 
 class Fees(Base):
     __tablename__ = 'fees'
+    __table_args__ = (UniqueConstraint('source_id', 'fee_type', name='fees_unique_constraint'),)
 
     id = Column(Integer, primary_key=True)
     source_id = Column(String)
@@ -164,10 +165,28 @@ class PaymentMethods(Base):
     primary_sell = Column(Boolean)
     allow_buy = Column(Boolean)
     allow_sell = Column(Boolean)
+    allow_deposit = Column(Boolean)
+    allow_withdraw = Column(Boolean)
     created_at = Column(DateTime(timezone=True))
     updated_at = Column(DateTime(timezone=True))
+    fiat_account_id = Column(String)
 
     document = Column(JSONB)
+
+
+class Limits(Base):
+    __tablename__ = 'limits'
+    __table_args__ = (UniqueConstraint('payment_method_id', 'limit_type', 'period_in_days',
+                                       name='limits_unique_constraint'),)
+
+    id = Column(Integer, primary_key=True)
+    payment_method_id = Column(String)
+    limit_type = Column(String)
+    period_in_days = Column(Integer)
+    remaining = Column(Numeric)
+    remaining_currency = Column(String)
+    total = Column(Numeric)
+    total_currency = Column(String)
 
 
 class Log(Base):

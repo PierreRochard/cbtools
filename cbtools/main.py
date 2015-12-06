@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from cbtools import db_logger
 from cbtools.models import (session, Users, Accounts, Addresses, Transactions,
-                            Exchanges, PaymentMethods, ReconciliationExceptions)
+                            Exchanges, Fees, PaymentMethods, Limits, ReconciliationExceptions)
 from cbtools.utilities import dict_compare
 
 
@@ -368,11 +368,327 @@ def update_transaction(account_id, transaction):
 
 
 def update_exchange(account_id, exchange):
-    pass
+    new_record = Exchanges()
+    new_record.document = json.loads(str(exchange))
+    new_record.account_id = account_id
+    timestamps = ['created_at', 'updated_at']
+    if 'payout_at' in exchange:
+        timestamps += ['payout_at']
+    for timestamp in timestamps:
+        setattr(new_record, timestamp, parse(exchange.pop(timestamp)).astimezone(tzlocal()))
+    new_record.exchange_type = exchange.pop('resource')
+    if exchange['transaction']:
+        new_record.transaction_id = exchange['transaction']['id']
+    new_record.payment_method_id = exchange['payment_method']['id']
+    new_record.amount = exchange['amount']['amount']
+    new_record.amount_currency = exchange['amount']['currency']
+    if 'total' in exchange:
+        new_record.total = exchange['total']['amount']
+        new_record.total_currency = exchange['total']['currency']
+        del exchange['total']
+    new_record.subtotal = exchange['subtotal']['amount']
+    new_record.subtotal_currency = exchange['subtotal']['currency']
+    for fee in exchange['fees']:
+        update_fee(exchange['id'], fee)
+    for key in ['resource_path', 'transaction', 'payment_method', 'amount', 'subtotal', 'fees']:
+        del exchange[key]
+    for key in exchange:
+        if hasattr(new_record, key):
+            if isinstance(exchange[key], dict):
+                setattr(new_record, key, json.loads(str(exchange[key])))
+            else:
+                setattr(new_record, key, exchange[key])
+        else:
+            db_logger.error('{0} is missing from Exchanges table, see {1}'.format(key, exchange['id']))
+            print(exchange)
+            print(key)
+            raise Exception
+    session.add(new_record)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        existing_exchange = session.query(Exchanges).filter(Exchanges.id == new_record.id).one()
+        for column in inspect(Exchanges).attrs:
+            cbtools_version = getattr(existing_exchange, column.key)
+            service_version = getattr(new_record, column.key)
+            is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
+            if is_dict and cbtools_version != service_version:
+                added, removed, modified, same = dict_compare(service_version, cbtools_version)
+                if not added and not removed and not modified:
+                    continue
+                else:
+                    new_exception = ReconciliationExceptions()
+                    new_exception.table_name = 'Exchanges'
+                    new_exception.record_id = existing_exchange.id
+                    new_exception.column_name = column.key
+                    new_exception.cbtools_version = cbtools_version
+                    new_exception.service_version = service_version
+                    new_exception.json_doc = True
+                    session.add(new_exception)
+                    try:
+                        session.commit()
+                    except IntegrityError:
+                        session.rollback()
+                        db_logger.warn('Commit New Reconciliation Exception IntegrityError')
+                    except ProgrammingError:
+                        session.rollback()
+                        db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+            elif cbtools_version == service_version:
+                continue
+            elif str(cbtools_version) != str(service_version):
+                new_exception = ReconciliationExceptions()
+                new_exception.table_name = 'Exchanges'
+                new_exception.record_id = existing_exchange.id
+                new_exception.column_name = column.key
+                new_exception.cbtools_version = cbtools_version
+                new_exception.service_version = service_version
+                new_exception.json_doc = False
+                session.add(new_exception)
+                try:
+                    session.commit()
+                except IntegrityError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception IntegrityError')
+                except ProgrammingError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+    except ProgrammingError:
+        session.rollback()
+        db_logger.error('Add Exchange ProgrammingError')
+        print(pformat(exchange))
+        raise
+
+
+def update_fee(source_id, fee):
+    new_record = Fees()
+    new_record.document = json.loads(str(fee))
+    new_record.source_id = source_id
+    new_record.fee_type = fee['type']
+    new_record.amount = fee['amount']['amount']
+    new_record.amount_currency = fee['amount']['currency']
+    session.add(new_record)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        existing_fee = session.query(Fees).filter(Fees.source_id == new_record.source_id,
+                                                       Fees.fee_type == new_record.fee_type).one()
+        for column in inspect(Fees).attrs:
+            cbtools_version = getattr(existing_fee, column.key)
+            service_version = getattr(new_record, column.key)
+            is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
+            if is_dict and cbtools_version != service_version:
+                added, removed, modified, same = dict_compare(service_version, cbtools_version)
+                if not added and not removed and not modified:
+                    continue
+                else:
+                    new_exception = ReconciliationExceptions()
+                    new_exception.table_name = 'Fees'
+                    new_exception.record_id = existing_fee.id
+                    new_exception.column_name = column.key
+                    new_exception.cbtools_version = cbtools_version
+                    new_exception.service_version = service_version
+                    new_exception.json_doc = True
+                    session.add(new_exception)
+                    try:
+                        session.commit()
+                    except IntegrityError:
+                        session.rollback()
+                        db_logger.warn('Commit New Reconciliation Exception IntegrityError')
+                    except ProgrammingError:
+                        session.rollback()
+                        db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+            elif cbtools_version == service_version:
+                continue
+            elif str(cbtools_version) != str(service_version):
+                new_exception = ReconciliationExceptions()
+                new_exception.table_name = 'Fees'
+                new_exception.record_id = existing_fee.id
+                new_exception.column_name = column.key
+                new_exception.cbtools_version = cbtools_version
+                new_exception.service_version = service_version
+                new_exception.json_doc = False
+                session.add(new_exception)
+                try:
+                    session.commit()
+                except IntegrityError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception IntegrityError')
+                except ProgrammingError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+    except ProgrammingError:
+        session.rollback()
+        db_logger.error('Add Fee ProgrammingError')
+        print(pformat(fee))
+        raise
 
 
 def update_payment_method(payment_method):
-    pass
+    new_record = PaymentMethods()
+    new_record.method_type = payment_method.pop('type')
+    new_record.document = json.loads(str(payment_method))
+    timestamps = ['created_at', 'updated_at']
+    for timestamp in timestamps:
+        setattr(new_record, timestamp, parse(payment_method.pop(timestamp)).astimezone(tzlocal()))
+    if 'fiat_account' in payment_method:
+        new_record.fiat_account_id = payment_method['fiat_account']['id']
+        del payment_method['fiat_account']
+    if 'limits' in payment_method:
+        update_limits(payment_method['id'], payment_method['limits'])
+        del payment_method['limits']
+    for key in ['resource_path', 'resource']:
+        del payment_method[key]
+    for key in payment_method:
+        if hasattr(new_record, key):
+            if isinstance(payment_method[key], dict):
+                setattr(new_record, key, json.loads(str(payment_method[key])))
+            else:
+                setattr(new_record, key, payment_method[key])
+        else:
+            db_logger.error('{0} is missing from Payment Methods table, see {1}'.format(key, payment_method['id']))
+            print(payment_method)
+            print(key)
+            raise Exception
+    session.add(new_record)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        existing_payment_method = session.query(PaymentMethods).filter(PaymentMethods.id == new_record.id).one()
+        for column in inspect(PaymentMethods).attrs:
+            cbtools_version = getattr(existing_payment_method, column.key)
+            service_version = getattr(new_record, column.key)
+            is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
+            if is_dict and cbtools_version != service_version:
+                added, removed, modified, same = dict_compare(service_version, cbtools_version)
+                if not added and not removed and not modified:
+                    continue
+                else:
+                    new_exception = ReconciliationExceptions()
+                    new_exception.table_name = 'PaymentMethods'
+                    new_exception.record_id = existing_payment_method.id
+                    new_exception.column_name = column.key
+                    new_exception.cbtools_version = cbtools_version
+                    new_exception.service_version = service_version
+                    new_exception.json_doc = True
+                    session.add(new_exception)
+                    try:
+                        session.commit()
+                    except IntegrityError:
+                        session.rollback()
+                        db_logger.warn('Commit New Reconciliation Exception IntegrityError')
+                    except ProgrammingError:
+                        session.rollback()
+                        db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+            elif cbtools_version == service_version:
+                continue
+            elif str(cbtools_version) != str(service_version):
+                new_exception = ReconciliationExceptions()
+                new_exception.table_name = 'Payments'
+                new_exception.record_id = existing_payment_method.id
+                new_exception.column_name = column.key
+                new_exception.cbtools_version = cbtools_version
+                new_exception.service_version = service_version
+                new_exception.json_doc = False
+                session.add(new_exception)
+                try:
+                    session.commit()
+                except IntegrityError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception IntegrityError')
+                except ProgrammingError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+    except ProgrammingError:
+        session.rollback()
+        db_logger.error('Add Payment Method ProgrammingError')
+        print(pformat(payment_method))
+        raise
+
+
+def update_limits(payment_method_id, limits):
+    for limit_type in limits:
+        for limit in limits[limit_type]:
+            new_record = Limits()
+            new_record.payment_method_id = payment_method_id
+            new_record.limit_type = limit_type
+            new_record.remaining = limit['remaining']['amount']
+            new_record.remaining_currency = limit['remaining']['currency']
+            del limit['remaining']
+            new_record.total = limit['total']['amount']
+            new_record.total_currency = limit['total']['currency']
+            del limit['total']
+            for key in limit:
+                if hasattr(new_record, key):
+                    if isinstance(limit[key], dict):
+                        setattr(new_record, key, json.loads(str(limit[key])))
+                    else:
+                        setattr(new_record, key, limit[key])
+                else:
+                    db_logger.error('{0} is missing from Limits table, see {1}'.format(key, payment_method_id))
+                    print(limit)
+                    print(key)
+                    raise Exception
+            session.add(new_record)
+            try:
+                    session.commit()
+            except IntegrityError:
+                session.rollback()
+                existing_limit = (session.query(Limits)
+                                  .filter(Limits.payment_method_id == new_record.payment_method_id,
+                                          Limits.limit_type == new_record.limit_type,
+                                          Limits.period_in_days == new_record.period_in_days).one())
+                for column in inspect(Limits).attrs:
+                    cbtools_version = getattr(existing_limit, column.key)
+                    service_version = getattr(new_record, column.key)
+                    is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
+                    if is_dict and cbtools_version != service_version:
+                        added, removed, modified, same = dict_compare(service_version, cbtools_version)
+                        if not added and not removed and not modified:
+                            continue
+                        else:
+                            new_exception = ReconciliationExceptions()
+                            new_exception.table_name = 'Limits'
+                            new_exception.record_id = existing_limit.id
+                            new_exception.column_name = column.key
+                            new_exception.cbtools_version = cbtools_version
+                            new_exception.service_version = service_version
+                            new_exception.json_doc = True
+                            session.add(new_exception)
+                            try:
+                                session.commit()
+                            except IntegrityError:
+                                session.rollback()
+                                db_logger.warn('Commit New Reconciliation Exception IntegrityError')
+                            except ProgrammingError:
+                                session.rollback()
+                                db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+                    elif cbtools_version == service_version:
+                        continue
+                    elif str(cbtools_version) != str(service_version):
+                        new_exception = ReconciliationExceptions()
+                        new_exception.table_name = 'Limits'
+                        new_exception.record_id = existing_limit.id
+                        new_exception.column_name = column.key
+                        new_exception.cbtools_version = cbtools_version
+                        new_exception.service_version = service_version
+                        new_exception.json_doc = False
+                        session.add(new_exception)
+                        try:
+                            session.commit()
+                        except IntegrityError:
+                            session.rollback()
+                            db_logger.error('Commit New Reconciliation Exception IntegrityError')
+                        except ProgrammingError:
+                            session.rollback()
+                            db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+            except ProgrammingError:
+                session.rollback()
+                db_logger.error('Add Limit ProgrammingError')
+                print(pformat(limit))
+                raise
 
 
 def update_database(api_key, api_secret):
@@ -387,11 +703,10 @@ def update_database(api_key, api_secret):
         update_account(account)
         for method, function in [('get_addresses', 'update_address'),
                                   ('get_transactions', 'update_transaction'),
-                                  # ('get_buys', 'update_exchange'),
-                                  # ('get_sells', 'update_exchange'),
-                                  # ('get_deposits', 'update_exchange'),
-                                  # ('get_withdrawals', 'update_exchange')
-                                 ]:
+                                  ('get_buys', 'update_exchange'),
+                                  ('get_sells', 'update_exchange'),
+                                  ('get_deposits', 'update_exchange'),
+                                  ('get_withdrawals', 'update_exchange')]:
             response = getattr(client, method)(account['id'])
             while response.pagination['next_uri']:
                 data = response['data']
@@ -404,8 +719,9 @@ def update_database(api_key, api_secret):
                 for datum in data:
                     globals()[function](account['id'], datum)
 
-    # payment_methods = client.get_payment_methods()
-    # update_payment_methods(payment_methods)
+    payment_methods = client.get_payment_methods()
+    for payment_method in payment_methods['data']:
+        update_payment_method(payment_method)
 
 
 if __name__ == '__main__':
