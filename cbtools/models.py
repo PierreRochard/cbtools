@@ -93,7 +93,6 @@ class Transactions(Base):
     __tablename__ = 'transactions'
 
     id = Column(String, primary_key=True)
-    exchange_id = Column(String)
     transaction_type = Column(String)
     status = Column(String)
     amount = Column(Numeric)
@@ -114,7 +113,9 @@ class Transactions(Base):
     from_address = Column(String)
     from_user_id = Column(String)
     address = Column(String)
-    application = Column(String)
+    application_id = Column(String)
+    order_id = Column(String)
+    exchange_id = Column(String)
 
     document = Column(JSONB)
 

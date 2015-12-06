@@ -235,6 +235,10 @@ def update_address(account_id, address):
 
 
 def update_transaction(account_id, transaction):
+    if 'application' in transaction:
+        from config import COINBASE_KEY, COINBASE_SECRET
+        client = Client(COINBASE_KEY, COINBASE_SECRET)
+        transaction = client.get_transaction(account_id, transaction['id'])
     new_transaction = Transactions()
     new_transaction.document = json.loads(str(transaction))
     new_transaction.account_id = account_id
@@ -290,8 +294,11 @@ def update_transaction(account_id, transaction):
         new_transaction.exchange_id = transaction['sell']['id']
         del transaction['sell']
     if 'order' in transaction:
-        print(pformat(transaction))
-        raise
+        new_transaction.order_id = transaction['order']['id']
+        del transaction['order']
+    if 'application' in transaction:
+        new_transaction.application_id = transaction['application']['id']
+        del transaction['application']
     if 'idem' in transaction:
         del transaction['idem']
     for key in transaction:
@@ -369,8 +376,8 @@ def update_payment_methods(payment_methods):
 
 
 def update_database(api_key, api_secret):
-    client = Client(api_key, api_secret)
 
+    client = Client(api_key, api_secret)
     current_user = client.get_current_user()
     update_user(current_user)
 
