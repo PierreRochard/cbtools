@@ -473,7 +473,7 @@ def update_fee(source_id, fee):
     except IntegrityError:
         session.rollback()
         existing_fee = session.query(Fees).filter(Fees.source_id == new_record.source_id,
-                                                       Fees.fee_type == new_record.fee_type).one()
+                                                  Fees.fee_type == new_record.fee_type).one()
         for column in inspect(Fees).attrs:
             if column.key == 'id':
                 continue
@@ -635,7 +635,7 @@ def update_limits(payment_method_id, limits):
                     raise Exception
             session.add(new_record)
             try:
-                    session.commit()
+                session.commit()
             except IntegrityError:
                 session.rollback()
                 existing_limit = (session.query(Limits)
@@ -696,7 +696,6 @@ def update_limits(payment_method_id, limits):
 
 
 def update_database(api_key, api_secret):
-
     client = Client(api_key, api_secret)
     current_user = client.get_current_user()
     update_user(current_user)
@@ -706,11 +705,11 @@ def update_database(api_key, api_secret):
     for account in accounts:
         update_account(account)
         for method, function in [('get_addresses', 'update_address'),
-                                  ('get_transactions', 'update_transaction'),
-                                  ('get_buys', 'update_exchange'),
-                                  ('get_sells', 'update_exchange'),
-                                  ('get_deposits', 'update_exchange'),
-                                  ('get_withdrawals', 'update_exchange')]:
+                                 ('get_transactions', 'update_transaction'),
+                                 ('get_buys', 'update_exchange'),
+                                 ('get_sells', 'update_exchange'),
+                                 ('get_deposits', 'update_exchange'),
+                                 ('get_withdrawals', 'update_exchange')]:
             response = getattr(client, method)(account['id'])
             while response.pagination['next_uri']:
                 data = response['data']
@@ -730,4 +729,5 @@ def update_database(api_key, api_secret):
 
 if __name__ == '__main__':
     from config import COINBASE_KEY, COINBASE_SECRET
+
     update_database(COINBASE_KEY, COINBASE_SECRET)
