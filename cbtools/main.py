@@ -86,8 +86,9 @@ def update_user(user):
         db_logger.error('Add User ProgrammingError')
 
 
-def update_account(account):
+def update_account(user_id, account):
     new_account = Accounts()
+    new_account.user_id = user_id
     new_account.document = json.loads(str(account))
     new_account.balance = Decimal(account['balance']['amount'])
     new_account.balance_currency = account['balance']['currency']
@@ -703,7 +704,7 @@ def update_database(api_key, api_secret):
     accounts = client.get_accounts()['data']
 
     for account in accounts:
-        update_account(account)
+        update_account(current_user['id'], account)
         for method, function in [('get_addresses', 'update_address'),
                                  ('get_transactions', 'update_transaction'),
                                  ('get_buys', 'update_exchange'),

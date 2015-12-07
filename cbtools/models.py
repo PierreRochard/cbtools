@@ -1,10 +1,11 @@
+import argparse
 import logging
 import traceback
 
 from sqlalchemy import (create_engine, func, UniqueConstraint, Boolean,
-                        Column, DateTime, Integer, Numeric, String)
+                        Column, DateTime, Integer, Numeric, String, ForeignKey)
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker, relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
 
 from config import URI
@@ -15,6 +16,10 @@ engine = create_engine(URI)
 session = scoped_session(sessionmaker(autocommit=False, autoflush=True, bind=engine))
 Base = declarative_base()
 Base.query = session.query_property()
+
+ARGS = argparse.ArgumentParser(description='Coinbase Exchange bot.')
+ARGS.add_argument('--d', action='store_true', dest='drop_tables', default=False, help='Drop tables')
+args = ARGS.parse_args()
 
 
 class ReconciliationExceptions(Base):
@@ -72,6 +77,10 @@ class Accounts(Base):
     native_balance_currency = Column(String)
     created_at = Column(DateTime(timezone=True))
     updated_at = Column(DateTime(timezone=True))
+
+    user_id = Column(String, ForeignKey('users.id'))
+
+    user = relationship("Users", backref=backref('accounts', order_by=id))
 
     document = Column(JSONB)
 
@@ -228,5 +237,6 @@ class SQLAlchemyLogHandler(logging.Handler):
 
 
 if __name__ == "__main__":
-    # Base.metadata.drop_all(bind=engine)
+    if args.drop_tables:
+        Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
