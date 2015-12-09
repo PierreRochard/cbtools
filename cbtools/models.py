@@ -116,11 +116,15 @@ class Transactions(Base):
     network_hash = Column(String)
     to_resource = Column(String)
     to_address = Column(String)
-    to_user_id = Column(String)
+    to_user_id = Column(String, ForeignKey('users.id'))
+    to_user = relationship("Users", backref=backref('transactions_sent', order_by=id),
+                           foreign_keys=[to_user_id])
     to_email = Column(String)
     from_resource = Column(String)
     from_address = Column(String)
-    from_user_id = Column(String)
+    from_user_id = Column(String, ForeignKey('users.id'))
+    from_user = relationship("Users", backref=backref('transactions_received', order_by=id),
+                             foreign_keys=[from_user_id])
     address = Column(String)
     application_id = Column(String)
     order_id = Column(String)
