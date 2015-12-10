@@ -396,9 +396,8 @@ def update_exchange(client, account_id, exchange):
         del exchange['total']
     new_record.subtotal = exchange['subtotal']['amount']
     new_record.subtotal_currency = exchange['subtotal']['currency']
-    for fee in exchange['fees']:
-        update_fee(client, exchange['id'], fee)
-    for key in ['resource_path', 'transaction', 'payment_method', 'amount', 'subtotal', 'fees']:
+    fees = exchange.pop('fees')
+    for key in ['resource_path', 'transaction', 'payment_method', 'amount', 'subtotal']:
         del exchange[key]
     for key in exchange:
         if hasattr(new_record, key):
@@ -466,6 +465,9 @@ def update_exchange(client, account_id, exchange):
         db_logger.error('Add Exchange ProgrammingError')
         print(pformat(exchange))
         raise
+
+    for fee in fees:
+        update_fee(client, exchange['id'], fee)
 
 
 def update_fee(client, source_id, fee):
@@ -711,12 +713,12 @@ def update_database(client):
 
     for account in accounts:
         update_account(client, current_user['id'], account)
-        for method, function in [('get_addresses', 'update_address'),
-                                 ('get_transactions', 'update_transaction'),
-                                 ('get_buys', 'update_exchange'),
+        for method, function in [('get_buys', 'update_exchange'),
                                  ('get_sells', 'update_exchange'),
                                  ('get_deposits', 'update_exchange'),
-                                 ('get_withdrawals', 'update_exchange')]:
+                                 ('get_withdrawals', 'update_exchange'),
+                                 ('get_addresses', 'update_address'),
+                                 ('get_transactions', 'update_transaction')]:
             response = getattr(client, method)(account['id'])
             while response.pagination['next_uri']:
                 data = response['data']

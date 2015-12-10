@@ -13,7 +13,7 @@ from config import URI
 
 engine = create_engine(URI)
 
-session = scoped_session(sessionmaker(autocommit=False, autoflush=True, bind=engine))
+session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 Base = declarative_base()
 Base.query = session.query_property()
 
@@ -117,18 +117,20 @@ class Transactions(Base):
     to_resource = Column(String)
     to_address = Column(String)
     to_user_id = Column(String, ForeignKey('users.id'))
-    to_user = relationship("Users", backref=backref('transactions_sent', order_by=id),
+    to_user = relationship('Users', backref=backref('transactions_sent', order_by=id),
                            foreign_keys=[to_user_id])
     to_email = Column(String)
     from_resource = Column(String)
     from_address = Column(String)
     from_user_id = Column(String, ForeignKey('users.id'))
-    from_user = relationship("Users", backref=backref('transactions_received', order_by=id),
+    from_user = relationship('Users', backref=backref('transactions_received', order_by=id),
                              foreign_keys=[from_user_id])
-    address = Column(String)
+    address = Column(String, ForeignKey('addresses.id'))
     application_id = Column(String)
     order_id = Column(String)
-    exchange_id = Column(String)
+
+    exchange_id = Column(String, ForeignKey('exchanges.id'))
+    exchange = relationship('Exchanges', uselist=False, backref=backref('transaction', order_by=id))
 
     document = Column(JSONB)
 
@@ -161,7 +163,8 @@ class Fees(Base):
     __table_args__ = (UniqueConstraint('source_id', 'fee_type', name='fees_unique_constraint'),)
 
     id = Column(Integer, primary_key=True)
-    source_id = Column(String)
+    source_id = Column(String, ForeignKey('exchanges.id'))
+    exchange = relationship('Exchanges', backref=backref('fees', order_by=id))
     fee_type = Column(String)
     amount = Column(Numeric)
     currency = Column(String)
