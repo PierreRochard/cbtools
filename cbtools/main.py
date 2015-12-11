@@ -3,6 +3,7 @@ import json
 from pprint import pformat
 
 from coinbase.wallet.client import Client
+from coinbase.wallet.error import NotFoundError
 from dateutil.parser import parse
 from dateutil.tz import tzlocal
 from sqlalchemy import inspect
@@ -12,15 +13,19 @@ from cbtools import db_logger
 from cbtools.models import (session, Users, Accounts, Addresses, Transactions,
                             Exchanges, Fees, PaymentMethods, Limits, ReconciliationExceptions)
 from cbtools.utilities import dict_compare
+from sqlalchemy.orm.exc import FlushError, NoResultFound
 
 
-def update_user(user):
+def update_user(client, user):
     new_user = Users()
     new_user.document = json.loads(str(user))
-    new_user.country_code = user['country']['code']
-    new_user.country_name = user['country']['name']
-    new_user.created_at = parse(user.pop('created_at')).astimezone(tzlocal())
-    for key in ['country', 'resource', 'resource_path']:
+    if 'country' in user:
+        new_user.country_code = user['country']['code']
+        new_user.country_name = user['country']['name']
+        del user['country']
+    if 'created_at' in user:
+        new_user.created_at = parse(user.pop('created_at')).astimezone(tzlocal())
+    for key in ['resource', 'resource_path']:
         del user[key]
     for key in user:
         if hasattr(new_user, key):
@@ -34,7 +39,7 @@ def update_user(user):
     session.add(new_user)
     try:
         session.commit()
-    except IntegrityError:
+    except (IntegrityError, FlushError):
         session.rollback()
         existing_user = session.query(Users).filter(Users.id == new_user.id).one()
         for column in inspect(Users).attrs:
@@ -86,7 +91,7 @@ def update_user(user):
         db_logger.error('Add User ProgrammingError')
 
 
-def update_account(user_id, account):
+def update_account(client, user_id, account):
     new_account = Accounts()
     new_account.user_id = user_id
     new_account.document = json.loads(str(account))
@@ -111,7 +116,7 @@ def update_account(user_id, account):
     session.add(new_account)
     try:
         session.commit()
-    except IntegrityError:
+    except (IntegrityError, FlushError):
         session.rollback()
         existing_account = session.query(Accounts).filter(Accounts.id == new_account.id).one()
         for column in inspect(Accounts).attrs:
@@ -163,7 +168,7 @@ def update_account(user_id, account):
         db_logger.error('Add Account ProgrammingError')
 
 
-def update_address(account_id, address):
+def update_address(client, account_id, address):
     new_address = Addresses()
     new_address.document = json.loads(str(address))
     new_address.account_id = account_id
@@ -235,10 +240,8 @@ def update_address(account_id, address):
         db_logger.error('Add Address ProgrammingError')
 
 
-def update_transaction(account_id, transaction):
+def update_transaction(client, account_id, transaction):
     if 'application' in transaction:
-        from config import COINBASE_KEY, COINBASE_SECRET
-        client = Client(COINBASE_KEY, COINBASE_SECRET)
         transaction = client.get_transaction(account_id, transaction['id'])
     new_transaction = Transactions()
     new_transaction.document = json.loads(str(transaction))
@@ -258,6 +261,8 @@ def update_transaction(account_id, transaction):
         if new_transaction.to_resource == 'bitcoin_address':
             new_transaction.to_address = transaction['to']['address']
         elif new_transaction.to_resource == 'user':
+            to_user = client.get_user(transaction['to']['id'])
+            update_user(client, to_user)
             new_transaction.to_user_id = transaction['to']['id']
         elif new_transaction.to_resource == 'email':
             new_transaction.to_email = transaction['to']['email']
@@ -270,6 +275,8 @@ def update_transaction(account_id, transaction):
         if new_transaction.from_resource == 'bitcoin_network':
             pass
         elif new_transaction.from_resource == 'user':
+            from_user = client.get_user(transaction['from']['id'])
+            update_user(client, from_user)
             new_transaction.from_user_id = transaction['from']['id']
         else:
             print(pformat(transaction['from']))
@@ -314,7 +321,7 @@ def update_transaction(account_id, transaction):
     session.add(new_transaction)
     try:
         session.commit()
-    except IntegrityError:
+    except (IntegrityError, FlushError):
         session.rollback()
         existing_transaction = session.query(Transactions).filter(Transactions.id == new_transaction.id).one()
         for column in inspect(Transactions).attrs:
@@ -368,7 +375,7 @@ def update_transaction(account_id, transaction):
         raise
 
 
-def update_exchange(account_id, exchange):
+def update_exchange(client, account_id, exchange):
     new_record = Exchanges()
     new_record.document = json.loads(str(exchange))
     new_record.account_id = account_id
@@ -381,6 +388,17 @@ def update_exchange(account_id, exchange):
     if exchange['transaction']:
         new_record.transaction_id = exchange['transaction']['id']
     new_record.payment_method_id = exchange['payment_method']['id']
+    try:
+        session.query(PaymentMethods).filter(PaymentMethods.id == exchange['payment_method']['id']).one()
+    except NoResultFound:
+        try:
+            payment_method = client.get_payment_method(exchange['payment_method']['id'])
+            update_payment_method(client, payment_method)
+        except NotFoundError:
+            new_payment_method = PaymentMethods()
+            new_payment_method.id = exchange['payment_method']['id']
+            session.add(new_payment_method)
+            session.commit()
     new_record.amount = exchange['amount']['amount']
     new_record.amount_currency = exchange['amount']['currency']
     if 'total' in exchange:
@@ -389,9 +407,8 @@ def update_exchange(account_id, exchange):
         del exchange['total']
     new_record.subtotal = exchange['subtotal']['amount']
     new_record.subtotal_currency = exchange['subtotal']['currency']
-    for fee in exchange['fees']:
-        update_fee(exchange['id'], fee)
-    for key in ['resource_path', 'transaction', 'payment_method', 'amount', 'subtotal', 'fees']:
+    fees = exchange.pop('fees')
+    for key in ['resource_path', 'transaction', 'payment_method', 'amount', 'subtotal']:
         del exchange[key]
     for key in exchange:
         if hasattr(new_record, key):
@@ -460,8 +477,11 @@ def update_exchange(account_id, exchange):
         print(pformat(exchange))
         raise
 
+    for fee in fees:
+        update_fee(client, exchange['id'], fee)
 
-def update_fee(source_id, fee):
+
+def update_fee(client, source_id, fee):
     new_record = Fees()
     new_record.document = json.loads(str(fee))
     new_record.source_id = source_id
@@ -528,7 +548,7 @@ def update_fee(source_id, fee):
         raise
 
 
-def update_payment_method(payment_method):
+def update_payment_method(client, payment_method):
     new_record = PaymentMethods()
     new_record.method_type = payment_method.pop('type')
     new_record.document = json.loads(str(payment_method))
@@ -539,8 +559,9 @@ def update_payment_method(payment_method):
         new_record.fiat_account_id = payment_method['fiat_account']['id']
         del payment_method['fiat_account']
     if 'limits' in payment_method:
-        update_limits(payment_method['id'], payment_method['limits'])
-        del payment_method['limits']
+        limits = payment_method.pop('limits')
+    else:
+        limits = None
     for key in ['resource_path', 'resource']:
         del payment_method[key]
     for key in payment_method:
@@ -609,9 +630,11 @@ def update_payment_method(payment_method):
         db_logger.error('Add Payment Method ProgrammingError')
         print(pformat(payment_method))
         raise
+    if limits:
+        update_limits(client, payment_method['id'], limits)
 
 
-def update_limits(payment_method_id, limits):
+def update_limits(client, payment_method_id, limits):
     for limit_type in limits:
         for limit in limits[limit_type]:
             new_record = Limits()
@@ -696,39 +719,39 @@ def update_limits(payment_method_id, limits):
                 raise
 
 
-def update_database(api_key, api_secret):
-    client = Client(api_key, api_secret)
+def update_database(client):
     current_user = client.get_current_user()
-    update_user(current_user)
+    update_user(client, current_user)
 
     accounts = client.get_accounts()['data']
+    for account in accounts:
+        update_account(client, current_user['id'], account)
+
+    payment_methods = client.get_payment_methods()
+    for payment_method in payment_methods['data']:
+        update_payment_method(client, payment_method)
 
     for account in accounts:
-        update_account(current_user['id'], account)
-        for method, function in [('get_addresses', 'update_address'),
-                                 ('get_transactions', 'update_transaction'),
-                                 ('get_buys', 'update_exchange'),
+        for method, function in [('get_buys', 'update_exchange'),
                                  ('get_sells', 'update_exchange'),
                                  ('get_deposits', 'update_exchange'),
-                                 ('get_withdrawals', 'update_exchange')]:
+                                 ('get_withdrawals', 'update_exchange'),
+                                 ('get_addresses', 'update_address'),
+                                 ('get_transactions', 'update_transaction')]:
             response = getattr(client, method)(account['id'])
             while response.pagination['next_uri']:
                 data = response['data']
                 for datum in data:
-                    globals()[function](account['id'], datum)
+                    globals()[function](client, account['id'], datum)
                 starting_after = response.pagination['next_uri'].split('=')[-1]
                 response = getattr(client, method)(account['id'], starting_after=starting_after)
             else:
                 data = response['data']
                 for datum in data:
-                    globals()[function](account['id'], datum)
-
-    payment_methods = client.get_payment_methods()
-    for payment_method in payment_methods['data']:
-        update_payment_method(payment_method)
+                    globals()[function](client, account['id'], datum)
 
 
 if __name__ == '__main__':
     from config import COINBASE_KEY, COINBASE_SECRET
-
-    update_database(COINBASE_KEY, COINBASE_SECRET)
+    client = Client(COINBASE_KEY, COINBASE_SECRET)
+    update_database(client)

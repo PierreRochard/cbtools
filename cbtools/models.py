@@ -13,7 +13,7 @@ from config import URI
 
 engine = create_engine(URI)
 
-session = scoped_session(sessionmaker(autocommit=False, autoflush=True, bind=engine))
+session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 Base = declarative_base()
 Base.query = session.query_property()
 
@@ -79,7 +79,6 @@ class Accounts(Base):
     updated_at = Column(DateTime(timezone=True))
 
     user_id = Column(String, ForeignKey('users.id'))
-
     user = relationship("Users", backref=backref('accounts', order_by=id))
 
     document = Column(JSONB)
@@ -89,7 +88,8 @@ class Addresses(Base):
     __tablename__ = 'addresses'
 
     id = Column(String, primary_key=True)
-    account_id = Column(String)
+    account_id = Column(String, ForeignKey('accounts.id'))
+    account = relationship('Accounts', backref=backref('addresses', order_by=id))
     address = Column(String)
     name = Column(String)
     created_at = Column(DateTime(timezone=True))
@@ -116,15 +116,21 @@ class Transactions(Base):
     network_hash = Column(String)
     to_resource = Column(String)
     to_address = Column(String)
-    to_user_id = Column(String)
+    to_user_id = Column(String, ForeignKey('users.id'))
+    to_user = relationship('Users', backref=backref('transactions_sent', order_by=id),
+                           foreign_keys=[to_user_id])
     to_email = Column(String)
     from_resource = Column(String)
     from_address = Column(String)
-    from_user_id = Column(String)
-    address = Column(String)
+    from_user_id = Column(String, ForeignKey('users.id'))
+    from_user = relationship('Users', backref=backref('transactions_received', order_by=id),
+                             foreign_keys=[from_user_id])
+    address = Column(String, ForeignKey('addresses.id'))
     application_id = Column(String)
     order_id = Column(String)
-    exchange_id = Column(String)
+
+    exchange_id = Column(String, ForeignKey('exchanges.id'))
+    exchange = relationship('Exchanges', uselist=False, backref=backref('transaction', order_by=id))
 
     document = Column(JSONB)
 
@@ -135,7 +141,8 @@ class Exchanges(Base):
     id = Column(String, primary_key=True)
     exchange_type = Column(String)
     status = Column(String)
-    payment_method_id = Column(String)
+    payment_method_id = Column(String, ForeignKey('payment_methods.id'))
+    payment_method = relationship('PaymentMethods', backref=backref('exchanges', order_by=id))
     transaction_id = Column(String)
     amount = Column(Numeric)
     amount_currency = Column(String)
@@ -157,7 +164,8 @@ class Fees(Base):
     __table_args__ = (UniqueConstraint('source_id', 'fee_type', name='fees_unique_constraint'),)
 
     id = Column(Integer, primary_key=True)
-    source_id = Column(String)
+    source_id = Column(String, ForeignKey('exchanges.id'))
+    exchange = relationship('Exchanges', backref=backref('fees', order_by=id))
     fee_type = Column(String)
     amount = Column(Numeric)
     currency = Column(String)
@@ -178,7 +186,8 @@ class PaymentMethods(Base):
     allow_withdraw = Column(Boolean)
     created_at = Column(DateTime(timezone=True))
     updated_at = Column(DateTime(timezone=True))
-    fiat_account_id = Column(String)
+    fiat_account_id = Column(String, ForeignKey('accounts.id'))
+    fiat_account = relationship('Accounts', backref=backref('payment_methods', order_by=id))
 
     document = Column(JSONB)
 
@@ -189,7 +198,8 @@ class Limits(Base):
                                        name='limits_unique_constraint'),)
 
     id = Column(Integer, primary_key=True)
-    payment_method_id = Column(String)
+    payment_method_id = Column(String, ForeignKey('payment_methods.id'))
+    payment_method = relationship('PaymentMethods', backref=backref('limits', order_by=id))
     limit_type = Column(String)
     period_in_days = Column(Integer)
     remaining = Column(Numeric)
