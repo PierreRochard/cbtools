@@ -79,7 +79,6 @@ class Accounts(Base):
     updated_at = Column(DateTime(timezone=True))
 
     user_id = Column(String, ForeignKey('users.id'))
-
     user = relationship("Users", backref=backref('accounts', order_by=id))
 
     document = Column(JSONB)
@@ -89,7 +88,8 @@ class Addresses(Base):
     __tablename__ = 'addresses'
 
     id = Column(String, primary_key=True)
-    account_id = Column(String)
+    account_id = Column(String, ForeignKey('accounts.id'))
+    account = relationship('Accounts', backref=backref('addresses', order_by=id))
     address = Column(String)
     name = Column(String)
     created_at = Column(DateTime(timezone=True))
@@ -141,7 +141,8 @@ class Exchanges(Base):
     id = Column(String, primary_key=True)
     exchange_type = Column(String)
     status = Column(String)
-    payment_method_id = Column(String)
+    payment_method_id = Column(String, ForeignKey('payment_methods.id'))
+    payment_method = relationship('PaymentMethods', backref=backref('exchanges', order_by=id))
     transaction_id = Column(String)
     amount = Column(Numeric)
     amount_currency = Column(String)
@@ -185,7 +186,8 @@ class PaymentMethods(Base):
     allow_withdraw = Column(Boolean)
     created_at = Column(DateTime(timezone=True))
     updated_at = Column(DateTime(timezone=True))
-    fiat_account_id = Column(String)
+    fiat_account_id = Column(String, ForeignKey('accounts.id'))
+    fiat_account = relationship('Accounts', backref=backref('payment_methods', order_by=id))
 
     document = Column(JSONB)
 
@@ -196,7 +198,8 @@ class Limits(Base):
                                        name='limits_unique_constraint'),)
 
     id = Column(Integer, primary_key=True)
-    payment_method_id = Column(String)
+    payment_method_id = Column(String, ForeignKey('payment_methods.id'))
+    payment_method = relationship('PaymentMethods', backref=backref('limits', order_by=id))
     limit_type = Column(String)
     period_in_days = Column(Integer)
     remaining = Column(Numeric)

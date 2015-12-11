@@ -3,6 +3,7 @@ import json
 from pprint import pformat
 
 from coinbase.wallet.client import Client
+from coinbase.wallet.error import NotFoundError
 from dateutil.parser import parse
 from dateutil.tz import tzlocal
 from sqlalchemy import inspect
@@ -12,11 +13,10 @@ from cbtools import db_logger
 from cbtools.models import (session, Users, Accounts, Addresses, Transactions,
                             Exchanges, Fees, PaymentMethods, Limits, ReconciliationExceptions)
 from cbtools.utilities import dict_compare
-from sqlalchemy.orm.exc import FlushError
+from sqlalchemy.orm.exc import FlushError, NoResultFound
 
 
 def update_user(client, user):
-    print(pformat(user))
     new_user = Users()
     new_user.document = json.loads(str(user))
     if 'country' in user:
@@ -388,6 +388,17 @@ def update_exchange(client, account_id, exchange):
     if exchange['transaction']:
         new_record.transaction_id = exchange['transaction']['id']
     new_record.payment_method_id = exchange['payment_method']['id']
+    try:
+        session.query(PaymentMethods).filter(PaymentMethods.id == exchange['payment_method']['id']).one()
+    except NoResultFound:
+        try:
+            payment_method = client.get_payment_method(exchange['payment_method']['id'])
+            update_payment_method(client, payment_method)
+        except NotFoundError:
+            new_payment_method = PaymentMethods()
+            new_payment_method.id = exchange['payment_method']['id']
+            session.add(new_payment_method)
+            session.commit()
     new_record.amount = exchange['amount']['amount']
     new_record.amount_currency = exchange['amount']['currency']
     if 'total' in exchange:
@@ -548,8 +559,9 @@ def update_payment_method(client, payment_method):
         new_record.fiat_account_id = payment_method['fiat_account']['id']
         del payment_method['fiat_account']
     if 'limits' in payment_method:
-        update_limits(client, payment_method['id'], payment_method['limits'])
-        del payment_method['limits']
+        limits = payment_method.pop('limits')
+    else:
+        limits = None
     for key in ['resource_path', 'resource']:
         del payment_method[key]
     for key in payment_method:
@@ -618,6 +630,8 @@ def update_payment_method(client, payment_method):
         db_logger.error('Add Payment Method ProgrammingError')
         print(pformat(payment_method))
         raise
+    if limits:
+        update_limits(client, payment_method['id'], limits)
 
 
 def update_limits(client, payment_method_id, limits):
@@ -710,9 +724,14 @@ def update_database(client):
     update_user(client, current_user)
 
     accounts = client.get_accounts()['data']
-
     for account in accounts:
         update_account(client, current_user['id'], account)
+
+    payment_methods = client.get_payment_methods()
+    for payment_method in payment_methods['data']:
+        update_payment_method(client, payment_method)
+
+    for account in accounts:
         for method, function in [('get_buys', 'update_exchange'),
                                  ('get_sells', 'update_exchange'),
                                  ('get_deposits', 'update_exchange'),
@@ -730,10 +749,6 @@ def update_database(client):
                 data = response['data']
                 for datum in data:
                     globals()[function](client, account['id'], datum)
-
-    payment_methods = client.get_payment_methods()
-    for payment_method in payment_methods['data']:
-        update_payment_method(client, payment_method)
 
 
 if __name__ == '__main__':
