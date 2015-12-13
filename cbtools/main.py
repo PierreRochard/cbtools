@@ -16,7 +16,6 @@ from sqlalchemy.orm.exc import FlushError
 
 
 def update_user(client, user):
-    print(pformat(user))
     new_user = Users()
     new_user.document = json.loads(str(user))
     if 'country' in user:
@@ -241,8 +240,8 @@ def update_address(client, account_id, address):
 
 
 def update_transaction(client, account_id, transaction):
-    if 'application' in transaction:
-        transaction = client.get_transaction(account_id, transaction['id'])
+    # if 'application' in transaction:
+    #     transaction = client.get_transaction(account_id, transaction['id'])
     new_transaction = Transactions()
     new_transaction.document = json.loads(str(transaction))
     new_transaction.account_id = account_id
@@ -736,5 +735,5 @@ def update_database(client):
 
 if __name__ == '__main__':
     from config import COINBASE_KEY, COINBASE_SECRET
-    client = Client(COINBASE_KEY, COINBASE_SECRET)
-    update_database(client)
+    cb_client = Client(COINBASE_KEY, COINBASE_SECRET)
+    update_database(cb_client)

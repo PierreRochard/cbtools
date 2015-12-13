@@ -13,7 +13,7 @@ from config import URI
 
 engine = create_engine(URI)
 
-session = scoped_session(sessionmaker(autocommit=False, autoflush=True, bind=engine))
+session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 Base = declarative_base()
 Base.query = session.query_property()
 
