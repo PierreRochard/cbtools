@@ -1,3 +1,4 @@
+import argparse
 from decimal import Decimal
 import json
 from pprint import pformat
@@ -8,15 +9,16 @@ from dateutil.parser import parse
 from dateutil.tz import tzlocal
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError, ProgrammingError
+from sqlalchemy.orm.exc import FlushError, NoResultFound
+import requests
 
 from cbtools import db_logger
 from cbtools.models import (session, Users, Accounts, Addresses, Transactions,
                             Exchanges, Fees, PaymentMethods, Limits, ReconciliationExceptions)
 from cbtools.utilities import dict_compare
-from sqlalchemy.orm.exc import FlushError, NoResultFound
 
 
-def update_user(client, user):
+def update_user(user, client):
     new_user = Users()
     new_user.document = json.loads(str(user))
     if 'country' in user:
@@ -91,10 +93,13 @@ def update_user(client, user):
         db_logger.error('Add User ProgrammingError')
 
 
-def update_account(client, user_id, account):
+def update_account(account, client=None, user_id=None, exchange_account=False):
     new_account = Accounts()
-    new_account.user_id = user_id
-    new_account.document = json.loads(str(account))
+    if exchange_account:
+        new_account.user_id = user_id
+        new_account.document = json.loads(str(account))
+    else:
+        new_account.document = json.loads(account)
     new_account.balance = Decimal(account['balance']['amount'])
     new_account.balance_currency = account['balance']['currency']
     new_account.native_balance = Decimal(account['native_balance']['amount'])
@@ -241,8 +246,6 @@ def update_address(client, account_id, address):
 
 
 def update_transaction(client, account_id, transaction):
-    # if 'application' in transaction:
-    #     transaction = client.get_transaction(account_id, transaction['id'])
     new_transaction = Transactions()
     new_transaction.document = json.loads(str(transaction))
     new_transaction.account_id = account_id
@@ -262,7 +265,7 @@ def update_transaction(client, account_id, transaction):
             new_transaction.to_address = transaction['to']['address']
         elif new_transaction.to_resource == 'user':
             to_user = client.get_user(transaction['to']['id'])
-            update_user(client, to_user)
+            update_user(to_user, client)
             new_transaction.to_user_id = transaction['to']['id']
         elif new_transaction.to_resource == 'email':
             new_transaction.to_email = transaction['to']['email']
@@ -276,7 +279,7 @@ def update_transaction(client, account_id, transaction):
             pass
         elif new_transaction.from_resource == 'user':
             from_user = client.get_user(transaction['from']['id'])
-            update_user(client, from_user)
+            update_user(from_user, client)
             new_transaction.from_user_id = transaction['from']['id']
         else:
             print(pformat(transaction['from']))
@@ -719,39 +722,64 @@ def update_limits(client, payment_method_id, limits):
                 raise
 
 
-def update_database(client):
-    current_user = client.get_current_user()
-    update_user(client, current_user)
+def update_wallet_data(wallet_client):
+    current_user = wallet_client.get_current_user()
+    update_user(current_user, wallet_client)
 
-    accounts = client.get_accounts()['data']
-    for account in accounts:
-        update_account(client, current_user['id'], account)
+    wallet_accounts = wallet_client.get_accounts()['data']
+    for wallet_account in wallet_accounts:
+        update_account(wallet_account, client=wallet_client, user_id=current_user['id'])
 
-    payment_methods = client.get_payment_methods()
+    payment_methods = wallet_client.get_payment_methods()
     for payment_method in payment_methods['data']:
-        update_payment_method(client, payment_method)
+        update_payment_method(wallet_client, payment_method)
 
-    for account in accounts:
+    for wallet_account in wallet_accounts:
         for method, function in [('get_buys', 'update_exchange'),
                                  ('get_sells', 'update_exchange'),
                                  ('get_deposits', 'update_exchange'),
                                  ('get_withdrawals', 'update_exchange'),
                                  ('get_addresses', 'update_address'),
                                  ('get_transactions', 'update_transaction')]:
-            response = getattr(client, method)(account['id'])
+            response = getattr(wallet_client, method)(wallet_account['id'])
             while response.pagination['next_uri']:
                 data = response['data']
                 for datum in data:
-                    globals()[function](client, account['id'], datum)
+                    globals()[function](wallet_client, wallet_account['id'], datum)
                 starting_after = response.pagination['next_uri'].split('=')[-1]
-                response = getattr(client, method)(account['id'], starting_after=starting_after)
+                response = getattr(wallet_client, method)(wallet_account['id'], starting_after=starting_after)
             else:
                 data = response['data']
                 for datum in data:
-                    globals()[function](client, account['id'], datum)
+                    globals()[function](wallet_client, wallet_account['id'], datum)
+
+
+def update_exchange_data(exchange_auth, exchange_api_url):
+    exchange_accounts = requests.get(exchange_api_url + 'accounts', auth=exchange_auth)
+    for exchange_account in exchange_accounts.json():
+        update_account(exchange_account)
+        print(pformat(exchange_account))
+        ledger = requests.get(exchange_api_url + 'accounts/' + exchange_account['id'] + '/ledger', auth=exchange_auth)
+        for entry in ledger.json():
+            print(pformat(entry))
 
 
 if __name__ == '__main__':
-    from config import COINBASE_KEY, COINBASE_SECRET
-    cb_client = Client(COINBASE_KEY, COINBASE_SECRET)
-    update_database(cb_client)
+    ARGS = argparse.ArgumentParser()
+    ARGS.add_argument('--w', action='store_true', dest='wallet',
+                      default=False, help='Download Coinbase Wallet Data')
+    ARGS.add_argument('--e', action='store_true', dest='exchange',
+                      default=False, help='Download Coinbase Exchange Data')
+    args = ARGS.parse_args()
+    if args.wallet:
+        from config import COINBASE_KEY, COINBASE_SECRET
+        coinbase_wallet_client = Client(COINBASE_KEY, COINBASE_SECRET)
+        update_wallet_data(coinbase_wallet_client)
+    if args.exchange:
+        from config import (COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET, COINBASE_EXCHANGE_API_PASSPHRASE)
+        from cbtools.utilities import CoinbaseExchangeAuthentication
+        exchange_api_url = 'https://api.exchange.coinbase.com/'
+        exchange_auth = CoinbaseExchangeAuthentication(COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET,
+                                                       COINBASE_EXCHANGE_API_PASSPHRASE)
+
+        update_exchange_data(exchange_auth, exchange_api_url)
