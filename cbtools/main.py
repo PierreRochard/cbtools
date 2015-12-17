@@ -735,7 +735,7 @@ def update_wallet_data(wallet_client):
 
     wallet_accounts = wallet_client.get_accounts()['data']
     for wallet_account in wallet_accounts:
-        update_account(wallet_account, client=wallet_client, user_id=current_user['id'])
+        update_account(wallet_account, user_id=current_user['id'])
 
     payment_methods = wallet_client.get_payment_methods()
     for payment_method in payment_methods['data']:
