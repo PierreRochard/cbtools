@@ -93,31 +93,38 @@ def update_user(user, client):
         db_logger.error('Add User ProgrammingError')
 
 
-def update_account(account, client=None, user_id=None, exchange_account=False):
+def update_account(account, user_id=None, exchange_account=False):
     new_account = Accounts()
     if exchange_account:
+        new_account.document = account
+        new_account.id = account['id']
+        new_account.balance = account['balance']
+        new_account.balance_currency = account['currency']
+        new_account.hold = account['hold']
+        new_account.hold_currency = account['currency']
+        new_account.available = account['available']
+        new_account.available_currency = account['currency']
+    else:
         new_account.user_id = user_id
         new_account.document = json.loads(str(account))
-    else:
-        new_account.document = json.loads(account)
-    new_account.balance = Decimal(account['balance']['amount'])
-    new_account.balance_currency = account['balance']['currency']
-    new_account.native_balance = Decimal(account['native_balance']['amount'])
-    new_account.native_balance_currency = account['native_balance']['currency']
-    new_account.account_type = account.pop('type')
-    for timestamp in ['created_at', 'updated_at']:
-        setattr(new_account, timestamp, parse(account.pop(timestamp)).astimezone(tzlocal()))
-    for key in ['balance', 'native_balance', 'resource', 'resource_path']:
-        del account[key]
-    for key in account:
-        if hasattr(new_account, key):
-            if isinstance(account[key], dict):
-                setattr(new_account, key, json.loads(str(account[key])))
+        new_account.balance = Decimal(account['balance']['amount'])
+        new_account.balance_currency = account['balance']['currency']
+        new_account.native_balance = Decimal(account['native_balance']['amount'])
+        new_account.native_balance_currency = account['native_balance']['currency']
+        new_account.account_type = account.pop('type')
+        for timestamp in ['created_at', 'updated_at']:
+            setattr(new_account, timestamp, parse(account.pop(timestamp)).astimezone(tzlocal()))
+        for key in ['balance', 'native_balance', 'resource', 'resource_path']:
+            del account[key]
+        for key in account:
+            if hasattr(new_account, key):
+                if isinstance(account[key], dict):
+                    setattr(new_account, key, json.loads(str(account[key])))
+                else:
+                    setattr(new_account, key, account[key])
             else:
-                setattr(new_account, key, account[key])
-        else:
-            db_logger.error('{0} is missing from Accounts table, see {1}'.format(key, account['id']))
-            continue
+                db_logger.error('{0} is missing from Accounts table, see {1}'.format(key, account['id']))
+                continue
     session.add(new_account)
     try:
         session.commit()
@@ -754,12 +761,12 @@ def update_wallet_data(wallet_client):
                     globals()[function](wallet_client, wallet_account['id'], datum)
 
 
-def update_exchange_data(exchange_auth, exchange_api_url):
-    exchange_accounts = requests.get(exchange_api_url + 'accounts', auth=exchange_auth)
+def update_exchange_data(auth, url):
+    exchange_accounts = requests.get(url + 'accounts', auth=auth)
     for exchange_account in exchange_accounts.json():
-        update_account(exchange_account)
+        update_account(exchange_account, exchange_account=True)
         print(pformat(exchange_account))
-        ledger = requests.get(exchange_api_url + 'accounts/' + exchange_account['id'] + '/ledger', auth=exchange_auth)
+        ledger = requests.get(url + 'accounts/' + exchange_account['id'] + '/ledger', auth=auth)
         for entry in ledger.json():
             print(pformat(entry))
 
