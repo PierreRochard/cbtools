@@ -766,9 +766,15 @@ def update_exchange_data(auth, url):
     for exchange_account in exchange_accounts.json():
         update_account(exchange_account, exchange_account=True)
         print(pformat(exchange_account))
-        ledger = requests.get(url + 'accounts/' + exchange_account['id'] + '/ledger', auth=auth)
-        for entry in ledger.json():
-            print(pformat(entry))
+        ledger = requests.get(url + 'accounts/' + exchange_account['id'] + '/ledger', auth=auth).json()
+        first = ledger[0]
+        print(first)
+        last = ledger[-1]
+        print(last)
+        while ledger:
+            ledger = requests.get(url + 'accounts/' + exchange_account['id'] + '/ledger', auth=auth).json()
+        # for entry in ledger:
+        #     print(pformat(entry))
 
 
 if __name__ == '__main__':
