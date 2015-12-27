@@ -296,8 +296,8 @@ class Holds(Base):
     account = relationship('Accounts', backref=backref('holds', order_by=created_at))
 
 
-class OpenOrders(Base):
-    __tablename__ = 'open_orders'
+class ExchangeOrders(Base):
+    __tablename__ = 'exchange_orders'
     __table_args__ = {'schema': 'cbtools'}
 
     id = Column(String, primary_key=True)
