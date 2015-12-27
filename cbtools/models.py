@@ -301,6 +301,7 @@ class ExchangeOrders(Base):
     __table_args__ = {'schema': 'cbtools'}
 
     id = Column(String, primary_key=True)
+    order_type = Column(String)
     size = Column(Numeric)
     price = Column(Numeric)
     product_id = Column(String)
@@ -309,6 +310,13 @@ class ExchangeOrders(Base):
     fill_fees = Column(Numeric)
     settled = Column(Boolean)
     side = Column(String)
+    post_only = Column(Boolean)
+    stp = Column(String)
+    time_in_force = Column(String)
+    done_at = Column(DateTime(timezone=True))
+    done_reason = Column(String)
+    reject_reason = Column(String)
+    funds = Column(Numeric)
     created_at = Column(DateTime(timezone=True))
 
 

@@ -5,7 +5,7 @@ import requests
 from coinbase.wallet.client import Client
 
 from cbtools import insert
-from cbtools.insert import update_entry, update_hold
+from cbtools.insert import update_entry, update_hold, update_exchange_order
 
 
 def update_wallet_data(wallet_client):
@@ -46,16 +46,24 @@ def update_exchange_data(auth, url):
         insert.update_account(exchange_account, exchange_account=True)
         for end_point, function in [
                                     # ('ledger', 'update_entry'),
-                                    ('holds', 'update_hold')
+                                    # ('holds', 'update_hold'),
+                                    ('orders', 'update_exchange_order')
                                     ]:
-            response = requests.get(url + 'accounts/' + exchange_account['id'] + '/' + end_point, auth=auth)
+            if end_point == 'orders':
+                # params = {'status': 'all'}
+                params = {'status': ['open', 'pending', 'done']}
+                end_point_url = url + 'orders'
+            else:
+                params = {}
+                end_point_url = url + 'accounts/' + exchange_account['id'] + '/' + end_point
+            response = requests.get(end_point_url, auth=auth, params=params)
             while 'CB-AFTER' in response.headers:
                 data = response.json()
                 for datum in data:
                     globals()[function](exchange_account['id'], datum)
                 starting_after = response.headers['CB-AFTER']
-                response = requests.get(url + 'accounts/' + exchange_account['id'] + '/' + end_point,
-                                        params={'after': starting_after}, auth=auth)
+                params['after'] = starting_after
+                response = requests.get(end_point_url, params=params, auth=auth)
             else:
                 data = response.json()
                 for datum in data:
