@@ -1,8 +1,10 @@
 import argparse
+from datetime import datetime
 from decimal import Decimal
 import json
 from pprint import pformat
 
+import pytz
 from coinbase.wallet.client import Client
 from coinbase.wallet.error import NotFoundError
 from dateutil.parser import parse
@@ -763,7 +765,7 @@ def update_entry(account_id, entry):
         session.commit()
     except (IntegrityError, FlushError):
         session.rollback()
-        existing_entry = (session.query(Entries).filter(Entries.id == new_record.id,).one())
+        existing_entry = (session.query(Entries).filter(Entries.id == new_record.id, ).one())
         for column in inspect(Entries).attrs:
             cbtools_version = getattr(existing_entry, column.key)
             service_version = getattr(new_record, column.key)
@@ -818,9 +820,12 @@ def update_entry(account_id, entry):
 def update_hold(account_id, hold):
     new_record = Holds()
     new_record.account_id = account_id
-    new_record.created_at = parse(hold.pop('created_at')).astimezone(tzlocal())
-    new_record.updated_at = parse(hold.pop('updated_at')).astimezone(tzlocal())
-
+    new_record.created_at = (datetime.strptime(hold.pop('created_at'), '%Y-%m-%d %H:%M:%S.%f')
+                             .replace(tzinfo=pytz.UTC).astimezone(tzlocal()))
+    if 'updated_at' in hold:
+        new_record.updated_at = (datetime.strptime(hold.pop('updated_at'), '%Y-%m-%d %H:%M:%S.%f')
+                                 .replace(tzinfo=pytz.UTC).astimezone(tzlocal()))
+    new_record.hold_type = hold.pop('type')
     for key in hold:
         if hasattr(new_record, key):
             if isinstance(hold[key], dict):
@@ -837,7 +842,7 @@ def update_hold(account_id, hold):
         session.commit()
     except (IntegrityError, FlushError):
         session.rollback()
-        existing_record = (session.query(Holds).filter(Holds.id == new_record.id,).one())
+        existing_record = (session.query(Holds).filter(Holds.id == new_record.id, ).one())
         for column in inspect(Holds).attrs:
             cbtools_version = getattr(existing_record, column.key)
             service_version = getattr(new_record, column.key)

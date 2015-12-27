@@ -5,7 +5,7 @@ import requests
 from coinbase.wallet.client import Client
 
 from cbtools import insert
-from cbtools.insert import update_entry
+from cbtools.insert import update_entry, update_hold
 
 
 def update_wallet_data(wallet_client):
