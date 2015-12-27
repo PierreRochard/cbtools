@@ -5,7 +5,7 @@ import requests
 from coinbase.wallet.client import Client
 
 from cbtools import insert
-from cbtools.insert import update_entry, update_hold, update_exchange_order
+from cbtools.insert import update_entry, update_hold, update_exchange_order, update_fill
 
 
 def update_wallet_data(wallet_client):
@@ -44,17 +44,18 @@ def update_exchange_data(auth, url):
     exchange_accounts = requests.get(url + 'accounts', auth=auth).json()
     for exchange_account in exchange_accounts:
         insert.update_account(exchange_account, exchange_account=True)
-        for end_point, function in [
-                                    # ('ledger', 'update_entry'),
-                                    # ('holds', 'update_hold'),
-                                    ('orders', 'update_exchange_order')
-                                    ]:
+        for end_point, function in [('ledger', 'update_entry'),
+                                    ('holds', 'update_hold'),
+                                    ('orders', 'update_exchange_order'),
+                                    ('fills', 'update_fill')]:
+            params = {}
             if end_point == 'orders':
-                # params = {'status': 'all'}
-                params = {'status': ['open', 'pending', 'done']}
+                # params['status'] = 'all'
+                params['status'] = ['open', 'pending', 'done']
                 end_point_url = url + 'orders'
+            elif end_point == 'fills':
+                end_point_url = url + 'fills'
             else:
-                params = {}
                 end_point_url = url + 'accounts/' + exchange_account['id'] + '/' + end_point
             response = requests.get(end_point_url, auth=auth, params=params)
             while 'CB-AFTER' in response.headers:

@@ -252,6 +252,7 @@ class Fills(Base):
     __tablename__ = 'fills'
     __table_args__ = {'schema': 'cbtools'}
     trade_id = Column(Integer, primary_key=True)
+    account_id = Column(String)
     product_id = Column(String)
     price = Column(Numeric)
     size = Column(Numeric)
@@ -261,6 +262,8 @@ class Fills(Base):
     fee = Column(Numeric)
     settled = Column(Boolean)
     side = Column(String)
+    profile_id = Column(String)
+    user_id = Column(String)
 
 
 class Entries(Base):

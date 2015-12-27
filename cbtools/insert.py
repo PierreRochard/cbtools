@@ -17,7 +17,7 @@ import requests
 from cbtools import db_logger
 from cbtools.models import (session, Users, Accounts, Addresses, Transactions,
                             Exchanges, Fees, PaymentMethods, Limits, ReconciliationExceptions, Entries, Holds,
-                            ExchangeOrders)
+                            ExchangeOrders, Fills)
 from cbtools.utilities import dict_compare
 
 
@@ -912,7 +912,7 @@ def update_exchange_order(account_id, order):
             else:
                 setattr(new_record, key, order[key])
         else:
-            db_logger.error('{0} is missing from Holds table, see {1}'.format(key, order['id']))
+            db_logger.error('{0} is missing from Exchange Orders table, see {1}'.format(key, order['id']))
             print(order)
             print(key)
             raise Exception
@@ -970,4 +970,77 @@ def update_exchange_order(account_id, order):
         session.rollback()
         db_logger.error('Add Exchange Order ProgrammingError')
         print(pformat(order))
+        raise
+
+
+def update_fill(account_id, fill):
+    new_record = Fills()
+    new_record.account_id = account_id
+    new_record.created_at = parse(fill.pop('created_at')).astimezone(tzlocal())
+
+    for key in fill:
+        if hasattr(new_record, key):
+            if isinstance(fill[key], dict):
+                setattr(new_record, key, json.loads(str(fill[key])))
+            else:
+                setattr(new_record, key, fill[key])
+        else:
+            db_logger.error('{0} is missing from Fills table, see {1}'.format(key, fill['id']))
+            print(fill)
+            print(key)
+            raise Exception
+    session.add(new_record)
+    try:
+        session.commit()
+    except (IntegrityError, FlushError):
+        session.rollback()
+        existing_record = (session.query(Fills).filter(Fills.trade_id == new_record.trade_id).one())
+        for column in inspect(Fills).attrs:
+            cbtools_version = getattr(existing_record, column.key)
+            service_version = getattr(new_record, column.key)
+            is_dict = isinstance(cbtools_version, dict) and isinstance(service_version, dict)
+            if is_dict and cbtools_version != service_version:
+                added, removed, modified, same = dict_compare(service_version, cbtools_version)
+                if not added and not removed and not modified:
+                    continue
+                else:
+                    new_exception = ReconciliationExceptions()
+                    new_exception.table_name = 'Fills'
+                    new_exception.record_id = existing_record.id
+                    new_exception.column_name = column.key
+                    new_exception.cbtools_version = cbtools_version
+                    new_exception.service_version = service_version
+                    new_exception.json_doc = True
+                    session.add(new_exception)
+                    try:
+                        session.commit()
+                    except IntegrityError:
+                        session.rollback()
+                        db_logger.warn('Commit New Reconciliation Exception IntegrityError')
+                    except ProgrammingError:
+                        session.rollback()
+                        db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+            elif cbtools_version == service_version:
+                continue
+            elif str(cbtools_version) != str(service_version):
+                new_exception = ReconciliationExceptions()
+                new_exception.table_name = 'Fills'
+                new_exception.record_id = existing_record.trade_id
+                new_exception.column_name = column.key
+                new_exception.cbtools_version = cbtools_version
+                new_exception.service_version = service_version
+                new_exception.json_doc = False
+                session.add(new_exception)
+                try:
+                    session.commit()
+                except IntegrityError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception IntegrityError')
+                except ProgrammingError:
+                    session.rollback()
+                    db_logger.error('Commit New Reconciliation Exception ProgrammingError')
+    except ProgrammingError:
+        session.rollback()
+        db_logger.error('Add Fills ProgrammingError')
+        print(pformat(fill))
         raise
