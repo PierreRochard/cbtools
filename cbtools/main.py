@@ -43,10 +43,20 @@ def update_exchange_data(auth, url):
     exchange_accounts = requests.get(url + 'accounts', auth=auth).json()
     for exchange_account in exchange_accounts:
         insert.update_account(exchange_account, exchange_account=True)
-        ledger = requests.get(url + 'accounts/' + exchange_account['id'] + '/ledger', auth=auth).json()
-        for entry in ledger:
-            insert.update_entry(entry)
-            print(pformat(entry))
+        ledger_response = requests.get(url + 'accounts/' + exchange_account['id'] + '/ledger', auth=auth)
+        for entry in ledger_response.json():
+            insert.update_entry(entry, exchange_account['id'])
+        next_request = ledger_response.headers['CB-AFTER']
+        while next_request:
+            ledger_response = requests.get(url + 'accounts/' + exchange_account['id'] + '/ledger',
+                                           params={'after': next_request},
+                                           auth=auth)
+            try:
+                next_request = ledger_response.headers['CB-AFTER']
+            except KeyError:
+                next_request = None
+            for entry in ledger_response.json():
+                insert.update_entry(entry, exchange_account['id'])
 
 
 if __name__ == '__main__':
