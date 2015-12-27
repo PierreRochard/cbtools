@@ -265,8 +265,7 @@ class Fills(Base):
 
 class Entries(Base):
     __tablename__ = 'entries'
-    __table_args__ = (UniqueConstraint('created_at', 'order_id',
-                                       name='entries_unique_constraint'), {'schema': 'cbtools'})
+    __table_args__ = {'schema': 'cbtools'}
     id = Column(Numeric, primary_key=True)
     amount = Column(Numeric)
     balance = Column(Numeric)
