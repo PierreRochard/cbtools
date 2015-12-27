@@ -158,7 +158,11 @@ def update_account(account, user_id=None, exchange_account=False):
                         db_logger.error('Commit New Reconciliation Exception ProgrammingError')
             elif cbtools_version == service_version:
                 continue
-            elif str(cbtools_version) != str(service_version):
+            try:
+                numeric_inequality = float(cbtools_version) != float(service_version)
+            except TypeError:
+                numeric_inequality = True
+            if str(cbtools_version) != str(service_version) and numeric_inequality:
                 new_exception = ReconciliationExceptions()
                 new_exception.table_name = 'Accounts'
                 new_exception.record_id = existing_account.id
@@ -741,6 +745,7 @@ def update_entry(entry, account_id):
         new_record.transfer_type = entry['details']['transfer_type']
     del entry['details']
     new_record.entry_type = entry.pop('type')
+    new_record.created_at = parse(entry.pop('created_at')).astimezone(tzlocal())
 
     for key in entry:
         if hasattr(new_record, key):
@@ -756,7 +761,7 @@ def update_entry(entry, account_id):
     session.add(new_record)
     try:
         session.commit()
-    except IntegrityError:
+    except (IntegrityError, FlushError):
         session.rollback()
         existing_entry = (session.query(Entries).filter(Entries.id == new_record.id,).one())
         for column in inspect(Entries).attrs:
