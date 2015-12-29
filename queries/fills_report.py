@@ -1,10 +1,9 @@
 import sys
 
-import numpy as np
 import pandas as pd
 
 sys.path.append('..')
-from cbtools.models import Fills, session, engine
+from cbtools.models import engine
 
 
 pd.set_option('display.float_format', lambda x: '%.8f' % x)
