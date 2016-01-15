@@ -79,3 +79,7 @@ venv
 config.py
 
 logs
+
+queries/.ipynb_checkpoints
+queries/*.csv
+queries/*.ipynb
