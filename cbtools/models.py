@@ -34,14 +34,6 @@ class Accounts(Base):
     type = Column(String)
     updated_at = Column(DateTime(timezone=True))
 
-    hold = Column(Numeric)
-    hold_currency = Column(String)
-    available = Column(Numeric)
-    available_currency = Column(String)
-    profile_id = Column(String)
-    user_id = Column(String, ForeignKey('cbtools.users.id'))
-    user = relationship("Users", backref=backref('accounts', order_by=id))
-
 
 class Addresses(Base):
     __tablename__ = 'addresses'
@@ -121,6 +113,37 @@ class Limits(Base):
     type = Column(String)
 
 
+# class Mispayments(Base):
+#     pass
+
+
+class Orders(Base):
+    __tablename__ = 'orders'
+    __table_args__ = {"schema": "cbtools"}
+
+    id = Column(String, primary_key=True)
+    code = Column(String)
+    status = Column(String)
+    order_type = Column(String)
+    name = Column(String)
+    description = Column(String)
+    amount = Column(Numeric)
+    amount_currency = Column(String)
+    payout_amount = Column(Numeric)
+    payout_amount_currency = Column(String)
+    bitcoin_address = Column(String)
+    bitcoin_amount = Column(Numeric)
+    bitcoin_amount_currency = Column(String)
+    bitcoin_uri = Column(String)
+    receipt_url = Column(String)
+    expires_at = Column(DateTime(timezone=True))
+    mispaid_at = Column(DateTime(timezone=True))
+    paid_at = Column(DateTime(timezone=True))
+    refund_address = Column(String)
+    transaction_id = Column(String, ForeignKey('cbtools.transactions.id'))
+    transaction = relationship('Transactions', uselist=False, backref=backref('order'))
+
+
 class PaymentMethods(Base):
     __tablename__ = 'payment_methods'
     __table_args__ = {"schema": "cbtools"}
@@ -143,6 +166,10 @@ class PaymentMethods(Base):
     resource_path = Column(String)
     type = Column(String)
     updated_at = Column(DateTime(timezone=True))
+
+
+# class Refunds(Base):
+#     pass
 
 
 class Transactions(Base):
@@ -222,6 +249,98 @@ class Users(Base):
     # TODO add show authorization information
 
 
+class ExchangeAccounts(Base):
+    __tablename__ = 'exchange_accounts'
+    __table_args__ = {"schema": "cbtools"}
+
+    available = Column(Numeric)
+    balance = Column(Numeric)
+    currency = Column(String)
+    hold = Column(Numeric)
+    id = Column(String, primary_key=True)
+    profile_id = Column(String)
+    resource = Column(String)
+
+
+class Fills(Base):
+    __tablename__ = 'fills'
+    __table_args__ = {'schema': 'cbtools'}
+
+    account_id = Column(String)
+    created_at = Column(DateTime(timezone=True))
+    fee = Column(Numeric)
+    liquidity = Column(String)
+    order_id = Column(String)
+    price = Column(Numeric)
+    product_id = Column(String)
+    profile_id = Column(String)
+    resource = Column(String)
+    settled = Column(Boolean)
+    side = Column(String)
+    size = Column(Numeric)
+    trade_id = Column(Integer, primary_key=True)
+    user_id = Column(String)
+
+
+class Holds(Base):
+    __tablename__ = 'holds'
+    __table_args__ = {'schema': 'cbtools'}
+
+    account = relationship('Accounts', backref=backref('holds'))
+    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
+    amount = Column(Numeric)
+    created_at = Column(DateTime(timezone=True))
+    id = Column(String, primary_key=True)
+    ref = Column(String)
+    resource = Column(String)
+    type = Column(String)
+
+
+class Entries(Base):
+    __tablename__ = 'entries'
+    __table_args__ = {'schema': 'cbtools'}
+
+    account = relationship('Accounts', backref=backref('entries'))
+    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
+    amount = Column(Numeric)
+    balance = Column(Numeric)
+    created_at = Column(DateTime(timezone=True))
+    entry_type = Column(String)
+    id = Column(Numeric, primary_key=True)
+    order_id = Column(String)
+    product_id = Column(String)
+    trade_id = Column(Integer)
+    transfer_id = Column(String)
+    transfer_type = Column(String)
+
+
+class ExchangeOrders(Base):
+    __tablename__ = 'exchange_orders'
+    __table_args__ = {'schema': 'cbtools'}
+
+    account = relationship('Accounts', backref=backref('entries'))
+    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
+    created_at = Column(DateTime(timezone=True))
+    done_at = Column(DateTime(timezone=True))
+    done_reason = Column(String)
+    fill_fees = Column(Numeric)
+    filled_size = Column(Numeric)
+    funds = Column(Numeric)
+    id = Column(String, primary_key=True)
+    post_only = Column(Boolean)
+    price = Column(Numeric)
+    product_id = Column(String)
+    resource = Column(String)
+    reject_reason = Column(String)
+    settled = Column(Boolean)
+    side = Column(String)
+    size = Column(Numeric)
+    status = Column(String)
+    stp = Column(String)
+    time_in_force = Column(String)
+    type = Column(String)
+
+
 class ReconciliationExceptions(Base):
     __tablename__ = 'reconciliation_exceptions'
     __table_args__ = (UniqueConstraint('record_id', 'column_name', name='rec_exception_constraint'),
@@ -239,115 +358,6 @@ class ReconciliationExceptions(Base):
 
     timestamp = Column(DateTime(timezone=True), default=func.now())
     resolved_timestamp = Column(DateTime(timezone=True))
-
-
-class Orders(Base):
-    __tablename__ = 'orders'
-    __table_args__ = {"schema": "cbtools"}
-
-    id = Column(String, primary_key=True)
-    code = Column(String)
-    status = Column(String)
-    order_type = Column(String)
-    name = Column(String)
-    description = Column(String)
-    amount = Column(Numeric)
-    amount_currency = Column(String)
-    payout_amount = Column(Numeric)
-    payout_amount_currency = Column(String)
-    bitcoin_address = Column(String)
-    bitcoin_amount = Column(Numeric)
-    bitcoin_amount_currency = Column(String)
-    bitcoin_uri = Column(String)
-    receipt_url = Column(String)
-    expires_at = Column(DateTime(timezone=True))
-    mispaid_at = Column(DateTime(timezone=True))
-    paid_at = Column(DateTime(timezone=True))
-    refund_address = Column(String)
-    transaction_id = Column(String, ForeignKey('cbtools.transactions.id'))
-    transaction = relationship('Transactions', uselist=False, backref=backref('order'))
-
-
-# class Refunds(Base):
-#     pass
-#
-# class Mispayments(Base):
-#     pass
-
-
-class Fills(Base):
-    __tablename__ = 'fills'
-    __table_args__ = {'schema': 'cbtools'}
-    trade_id = Column(Integer, primary_key=True)
-    account_id = Column(String)
-    product_id = Column(String)
-    price = Column(Numeric)
-    size = Column(Numeric)
-    order_id = Column(String)
-    created_at = Column(DateTime(timezone=True))
-    liquidity = Column(String)
-    fee = Column(Numeric)
-    settled = Column(Boolean)
-    side = Column(String)
-    profile_id = Column(String)
-    user_id = Column(String)
-
-
-class Entries(Base):
-    __tablename__ = 'entries'
-    __table_args__ = {'schema': 'cbtools'}
-    id = Column(Numeric, primary_key=True)
-    amount = Column(Numeric)
-    balance = Column(Numeric)
-    created_at = Column(DateTime(timezone=True))
-    order_id = Column(String)
-    product_id = Column(String)
-    trade_id = Column(Integer)
-    transfer_id = Column(String)
-    transfer_type = Column(String)
-    entry_type = Column(String)
-
-    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
-    account = relationship('Accounts', backref=backref('entries', order_by=created_at))
-
-
-class Holds(Base):
-    __tablename__ = 'holds'
-    __table_args__ = {'schema': 'cbtools'}
-
-    id = Column(String, primary_key=True)
-
-    created_at = Column(DateTime(timezone=True))
-    updated_at = Column(DateTime(timezone=True))
-    amount = Column(Numeric)
-    hold_type = Column(String)
-    ref = Column(String)
-    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
-    account = relationship('Accounts', backref=backref('holds', order_by=created_at))
-
-
-class ExchangeOrders(Base):
-    __tablename__ = 'exchange_orders'
-    __table_args__ = {'schema': 'cbtools'}
-
-    id = Column(String, primary_key=True)
-    order_type = Column(String)
-    size = Column(Numeric)
-    price = Column(Numeric)
-    product_id = Column(String)
-    status = Column(String)
-    filled_size = Column(Numeric)
-    fill_fees = Column(Numeric)
-    settled = Column(Boolean)
-    side = Column(String)
-    post_only = Column(Boolean)
-    stp = Column(String)
-    time_in_force = Column(String)
-    done_at = Column(DateTime(timezone=True))
-    done_reason = Column(String)
-    reject_reason = Column(String)
-    funds = Column(Numeric)
-    created_at = Column(DateTime(timezone=True))
 
 
 class Log(Base):
