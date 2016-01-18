@@ -19,7 +19,7 @@ from cbtools import models, db_logger
 
 
 def get_wallet_data(wallet_client, refresh):
-    denested_json_file = 'denested_wallet_jsons.json'
+    denested_json_file = tmp_directory + 'denested_wallet_jsons.json'
     if not os.path.exists(denested_json_file) or refresh:
         denested_jsons = []
         current_user = wallet_client.get_current_user()
@@ -53,7 +53,7 @@ def get_wallet_data(wallet_client, refresh):
 
 
 def get_exchange_data(auth, url, refresh):
-    denested_json_file = 'denested_exchange_jsons.json'
+    denested_json_file = tmp_directory + 'denested_exchange_jsons.json'
     if not os.path.exists(denested_json_file) or refresh:
         denested_jsons = []
         exchange_accounts = requests.get(url + 'accounts', auth=auth).json()
@@ -63,19 +63,20 @@ def get_exchange_data(auth, url, refresh):
                                         ('holds', 'update_hold'),
                                         ('orders', 'update_exchange_order'),
                                         ('fills', 'update_fill')]:
+                if end_point.endswith('s'):
+                    resource = end_point[:-1]
+                else:
+                    resource = end_point
                 params = {}
                 if end_point == 'orders':
                     # params['status'] = 'all'
                     params['status'] = ['open', 'pending', 'done']
                     end_point_url = url + 'orders'
+                    resource = 'exchange_order'
                 elif end_point == 'fills':
                     end_point_url = url + 'fills'
                 else:
                     end_point_url = url + 'accounts/' + exchange_account['id'] + '/' + end_point
-                if end_point.endswith('s'):
-                    resource = end_point[:-1]
-                else:
-                    resource = end_point
                 response = requests.get(end_point_url, auth=auth, params=params)
                 denested_jsons += denest_json(response.json(), account_id=exchange_account['id'], resource=resource)
                 while 'CB-AFTER' in response.headers:
@@ -101,6 +102,7 @@ resource_to_model = OrderedDict([('user', models.Users),
                                 ('ledger', models.Entries),
                                 ('limit', [models.Limits, ('payment_method_id', 'type', 'period_in_days')]),
                                 ('order', models.Orders),
+                                ('exchange_order', models.ExchangeOrders),
                                 ('buy', models.Exchanges),
                                 ('deposit', models.Exchanges),
                                 ('sell', models.Exchanges),
@@ -197,8 +199,11 @@ if __name__ == '__main__':
                       default=False, help='Load Coinbase Wallet Data into the database')
     ARGS.add_argument('--e', action='store_true', dest='exchange',
                       default=False, help='Load Coinbase Exchange Data into the database')
-    ARGS.add_argument('--r', action='stor_true', dest='refresh', default=False, help='Refresh the data')
+    ARGS.add_argument('--r', action='store_true', dest='refresh', default=False, help='Refresh the data')
     args = ARGS.parse_args()
+    tmp_directory = 'tmp/'
+    if not os.path.exists(tmp_directory):
+        os.mkdir(tmp_directory)
     json_docs = []
     if args.wallet:
         from config import COINBASE_KEY, COINBASE_SECRET
