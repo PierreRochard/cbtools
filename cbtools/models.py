@@ -4,7 +4,7 @@ import traceback
 
 from sqlalchemy import create_engine, func, UniqueConstraint, Boolean
 from sqlalchemy import Column, DateTime, Integer, Numeric, String, ForeignKey
-from sqlalchemy.orm import scoped_session, sessionmaker, relationship, backref
+from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 from config import URI
@@ -39,7 +39,6 @@ class Addresses(Base):
     __tablename__ = 'addresses'
     __table_args__ = {"schema": "cbtools"}
 
-    account = relationship('Accounts', backref=backref('addresses', order_by=id))
     account_id = Column(String, ForeignKey('cbtools.accounts.id'))
     address = Column(String)
     callback_url = Column(String)
@@ -55,7 +54,6 @@ class Exchanges(Base):
     __tablename__ = 'exchanges'
     __table_args__ = {"schema": "cbtools"}
 
-    account = relationship('Accounts', backref=backref('addresses', order_by=id))
     account_id = Column(String, ForeignKey('cbtools.accounts.id'))
     amount = Column(Numeric)
     amount_currency = Column(String)
@@ -63,8 +61,8 @@ class Exchanges(Base):
     created_at = Column(DateTime(timezone=True))
     id = Column(String, primary_key=True)
     instant = Column(Boolean)
-    payment_method = relationship('PaymentMethods', backref=backref('exchanges', order_by=id))
-    payment_method_id = Column(String, ForeignKey('cbtools.payment_methods.id'))
+    # payment_method_id = Column(String, ForeignKey('cbtools.payment_methods.id'))
+    payment_method_id = Column(String)
     payment_method_resource = Column(String)
     payment_method_resource_path = Column(String)
     payout_at = Column(DateTime(timezone=True))
@@ -89,7 +87,6 @@ class Fees(Base):
 
     id = Column(Integer, primary_key=True)
     source_id = Column(String, ForeignKey('cbtools.exchanges.id'))
-    exchange = relationship('Exchanges', backref=backref('fees', order_by=id))
     fee_type = Column(String)
     amount = Column(Numeric)
     currency = Column(String)
@@ -102,7 +99,6 @@ class Limits(Base):
                       {"schema": "cbtools"})
     id = Column(Integer, primary_key=True)
 
-    payment_method = relationship('PaymentMethods', backref=backref('limits', order_by=id))
     payment_method_id = Column(String, ForeignKey('cbtools.payment_methods.id'))
     period_in_days = Column(Integer)
     remaining = Column(Numeric)
@@ -141,7 +137,6 @@ class Orders(Base):
     paid_at = Column(DateTime(timezone=True))
     refund_address = Column(String)
     transaction_id = Column(String, ForeignKey('cbtools.transactions.id'))
-    transaction = relationship('Transactions', uselist=False, backref=backref('order'))
 
 
 class PaymentMethods(Base):
@@ -154,7 +149,6 @@ class PaymentMethods(Base):
     allow_withdraw = Column(Boolean)
     created_at = Column(DateTime(timezone=True))
     currency = Column(String)
-    fiat_account = relationship('Accounts', backref=backref('payment_methods', order_by=id))
     fiat_account_id = Column(String, ForeignKey('cbtools.accounts.id'))
     fiat_account_resource = Column(String)
     fiat_account_resource_path = Column(String)
@@ -176,7 +170,6 @@ class Transactions(Base):
     __tablename__ = 'transactions'
     __table_args__ = {"schema": "cbtools"}
 
-    account = relationship('Accounts', backref=backref('addresses', order_by=id))
     account_id = Column(String, ForeignKey('cbtools.accounts.id'))
     address_id = Column(String, ForeignKey('cbtools.addresses.id'))
     address_resource = Column(String)
@@ -185,7 +178,6 @@ class Transactions(Base):
     amount_currency = Column(String)
     application_id = Column(String)
     application_resource = Column(String)
-    buy = relationship('Exchanges', uselist=False, backref=backref('transaction', order_by=id))
     buy_id = Column(String, ForeignKey('cbtools.exchanges.id'))
     buy_resource = Column(String)
     buy_resource_path = Column(String)
@@ -264,8 +256,8 @@ class ExchangeAccounts(Base):
 
 class Fills(Base):
     __tablename__ = 'fills'
-    __table_args__ = {'schema': 'cbtools'}
-
+    __table_args__ = (UniqueConstraint('trade_id', 'created_at', 'account_id', name='fills_constraint'), {'schema': 'cbtools'})
+    id = Column(Integer, primary_key=True)
     account_id = Column(String)
     created_at = Column(DateTime(timezone=True))
     fee = Column(Numeric)
@@ -278,7 +270,7 @@ class Fills(Base):
     settled = Column(Boolean)
     side = Column(String)
     size = Column(Numeric)
-    trade_id = Column(Integer, primary_key=True)
+    trade_id = Column(Integer)
     user_id = Column(String)
 
 
@@ -286,8 +278,7 @@ class Holds(Base):
     __tablename__ = 'holds'
     __table_args__ = {'schema': 'cbtools'}
 
-    account = relationship('Accounts', backref=backref('holds'))
-    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
+    account_id = Column(String, ForeignKey('cbtools.exchange_accounts.id'))
     amount = Column(Numeric)
     created_at = Column(DateTime(timezone=True))
     id = Column(String, primary_key=True)
@@ -300,8 +291,7 @@ class Entries(Base):
     __tablename__ = 'entries'
     __table_args__ = {'schema': 'cbtools'}
 
-    account = relationship('Accounts', backref=backref('entries'))
-    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
+    account_id = Column(String, ForeignKey('cbtools.exchange_accounts.id'))
     amount = Column(Numeric)
     balance = Column(Numeric)
     created_at = Column(DateTime(timezone=True))
@@ -318,8 +308,7 @@ class ExchangeOrders(Base):
     __tablename__ = 'exchange_orders'
     __table_args__ = {'schema': 'cbtools'}
 
-    account = relationship('Accounts', backref=backref('entries'))
-    account_id = Column(String, ForeignKey('cbtools.accounts.id'))
+    account_id = Column(String, ForeignKey('cbtools.exchange_accounts.id'))
     created_at = Column(DateTime(timezone=True))
     done_at = Column(DateTime(timezone=True))
     done_reason = Column(String)
@@ -350,9 +339,10 @@ class ReconciliationExceptions(Base):
     table_name = Column(String)
     record_id = Column(String)
     column_name = Column(String)
-    cbtools_version = Column(String)
-    coinbase_version = Column(String)
-    json_doc = Column(Boolean)
+    old_version = Column(String)
+    new_version = Column(String)
+    old_version_type = Column(String)
+    new_version_type = Column(String)
     resolved = Column(Boolean, default=False)
     resolution = Column(String, default=None)
 
