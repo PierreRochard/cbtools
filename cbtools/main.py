@@ -196,10 +196,10 @@ def insert(document):
 if __name__ == '__main__':
     ARGS = argparse.ArgumentParser()
     ARGS.add_argument('--w', action='store_true', dest='wallet',
-                      default=False, help='Load Coinbase Wallet Data into the database')
+                      default=True, help='Load Coinbase Wallet Data into the database')
     ARGS.add_argument('--e', action='store_true', dest='exchange',
-                      default=False, help='Load Coinbase Exchange Data into the database')
-    ARGS.add_argument('--r', action='store_true', dest='refresh', default=False, help='Refresh the data')
+                      default=True, help='Load Coinbase Exchange Data into the database')
+    ARGS.add_argument('--r', action='store_true', dest='refresh', default=True, help='Refresh the data')
     args = ARGS.parse_args()
     tmp_directory = 'tmp/'
     if not os.path.exists(tmp_directory):
