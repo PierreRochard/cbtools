@@ -83,3 +83,6 @@ logs
 queries/.ipynb_checkpoints
 queries/*.csv
 queries/*.ipynb
+tests/data
+
+cbtools/tmp
