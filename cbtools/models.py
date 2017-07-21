@@ -12,6 +12,7 @@ from config import URI
 engine = create_engine(URI)
 
 session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+session.execute("CREATE SCHEMA IF NOT EXISTS cbtools;")
 Base = declarative_base()
 Base.query = session.query_property()
 
