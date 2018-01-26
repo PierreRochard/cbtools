@@ -10,9 +10,29 @@ from sqlalchemy.ext.declarative import declarative_base
 from config import URI
 
 engine = create_engine(URI)
-session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+session = scoped_session(
+    sessionmaker(autocommit=False, autoflush=False, bind=engine))
 Base = declarative_base()
 Base.query = session.query_property()
+
+
+class Accounts(Base):
+    __tablename__ = 'accounts'
+    __table_args__ = {"schema": "cbtools"}
+
+    balance_amount = Column(Numeric)
+    balance_currency = Column(String)
+    created_at = Column(DateTime(timezone=True))
+    currency = Column(String)
+    id = Column(String, primary_key=True)
+    name = Column(String)
+    native_balance_amount = Column(Numeric)
+    native_balance_currency = Column(String)
+    primary = Column(Boolean)
+    resource = Column(String)
+    resource_path = Column(String)
+    type = Column(String)
+    updated_at = Column(DateTime(timezone=True))
 
 
 class Addresses(Base):
@@ -64,8 +84,9 @@ class Exchanges(Base):
 
 class Fees(Base):
     __tablename__ = 'fees'
-    __table_args__ = (UniqueConstraint('source_id', 'fee_type', name='fees_unique_constraint'),
-                      {"schema": "cbtools"})
+    __table_args__ = (
+    UniqueConstraint('source_id', 'fee_type', name='fees_unique_constraint'),
+    {"schema": "cbtools"})
 
     id = Column(Integer, primary_key=True)
     source_id = Column(String, ForeignKey('cbtools.exchanges.id'))
@@ -76,9 +97,10 @@ class Fees(Base):
 
 class Limits(Base):
     __tablename__ = 'limits'
-    __table_args__ = (UniqueConstraint('payment_method_id', 'type', 'period_in_days',
-                                       name='limits_unique_constraint'),
-                      {"schema": "cbtools"})
+    __table_args__ = (
+    UniqueConstraint('payment_method_id', 'type', 'period_in_days',
+                     name='limits_unique_constraint'),
+    {"schema": "cbtools"})
     id = Column(Integer, primary_key=True)
 
     payment_method_id = Column(String, ForeignKey('cbtools.payment_methods.id'))
@@ -247,7 +269,9 @@ class ExchangeAccounts(Base):
 
 class Fills(Base):
     __tablename__ = 'fills'
-    __table_args__ = (UniqueConstraint('trade_id', 'created_at', 'account_id', name='fills_constraint'), {'schema': 'cbtools'})
+    __table_args__ = (UniqueConstraint('trade_id', 'created_at', 'account_id',
+                                       name='fills_constraint'),
+                      {'schema': 'cbtools'})
     id = Column(Integer, primary_key=True)
     account_id = Column(String)
     created_at = Column(DateTime(timezone=True))
@@ -324,7 +348,8 @@ class ExchangeOrders(Base):
 
 class ReconciliationExceptions(Base):
     __tablename__ = 'reconciliation_exceptions'
-    __table_args__ = (UniqueConstraint('record_id', 'column_name', name='rec_exception_constraint'),
+    __table_args__ = (UniqueConstraint('record_id', 'column_name',
+                                       name='rec_exception_constraint'),
                       {"schema": "cbtools"})
 
     id = Column(Integer, primary_key=True)
@@ -357,13 +382,15 @@ class Log(Base):
     browser = Column(String)
     version = Column(String)
     language = Column(String)
-    created_at = Column(DateTime(timezone=True), default=func.now().op('AT TIME ZONE')('UTC'))
+    created_at = Column(DateTime(timezone=True),
+                        default=func.now().op('AT TIME ZONE')('UTC'))
 
     def __unicode__(self):
         return self.__repr__()
 
     def __repr__(self):
-        return '<Log: %s - %s>' % (self.created_at.strftime('%m/%d/%Y-%H:%M:%S'), self.msg[:50])
+        return '<Log: %s - %s>' % (
+        self.created_at.strftime('%m/%d/%Y-%H:%M:%S'), self.msg[:50])
 
 
 class SQLAlchemyLogHandler(logging.Handler):
@@ -384,7 +411,8 @@ class SQLAlchemyLogHandler(logging.Handler):
 
 if __name__ == '__main__':
     ARGS = argparse.ArgumentParser()
-    ARGS.add_argument('--d', action='store_true', dest='drop_tables', default=False, help='Drop tables')
+    ARGS.add_argument('--d', action='store_true', dest='drop_tables',
+                      default=False, help='Drop tables')
     args = ARGS.parse_args()
 
     session.execute("CREATE SCHEMA IF NOT EXISTS cbtools;")
