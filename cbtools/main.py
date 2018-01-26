@@ -211,12 +211,12 @@ if __name__ == '__main__':
         coinbase_wallet_client = Client(COINBASE_KEY, COINBASE_SECRET)
         json_docs += get_wallet_data(coinbase_wallet_client, args.refresh)
     if args.exchange:
-        from config import (COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET, COINBASE_EXCHANGE_API_PASSPHRASE)
+        from config import (GDAX_API_KEY, GDAX_API_SECRET, GDAX_API_PASSPHRASE)
         from cbtools.utilities import CoinbaseExchangeAuthentication
 
         exchange_api_url = 'https://api.gdax.com/'
-        exchange_auth = CoinbaseExchangeAuthentication(COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET,
-                                                       COINBASE_EXCHANGE_API_PASSPHRASE)
+        exchange_auth = CoinbaseExchangeAuthentication(GDAX_API_KEY, GDAX_API_SECRET,
+                                                       GDAX_API_PASSPHRASE)
 
         json_docs += get_exchange_data(exchange_auth, exchange_api_url, args.refresh)
 

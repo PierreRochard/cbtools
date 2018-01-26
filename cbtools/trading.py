@@ -4,12 +4,12 @@ import requests
 from decimal import Decimal
 
 from cbtools.utilities import CoinbaseExchangeAuthentication
-from config import COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_PASSPHRASE, COINBASE_EXCHANGE_API_SECRET
+from config import GDAX_API_KEY, GDAX_API_PASSPHRASE, GDAX_API_SECRET
 
 if __name__ == '__main__':
     exchange_api_url = 'https://api.gdax.com/'
-    exchange_auth = CoinbaseExchangeAuthentication(COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET,
-                                                       COINBASE_EXCHANGE_API_PASSPHRASE)
+    exchange_auth = CoinbaseExchangeAuthentication(GDAX_API_KEY, GDAX_API_SECRET,
+                                                       GDAX_API_PASSPHRASE)
 
     # requests.delete(exchange_api_url + 'orders', auth=exchange_auth)
     exchange_accounts = requests.get(exchange_api_url + 'accounts', auth=exchange_auth).json()

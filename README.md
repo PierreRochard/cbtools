@@ -11,25 +11,7 @@ If you need help with any of these steps please feel free to open an issue, I'd 
 
 3. Clone the cbtools repository
 
-4. Create a config.py file in the current directory with the following parameters:
-
-```
-# I would advise setting the key permissions restrictively, only select ones with 'read' and 'limits'
-COINBASE_KEY = ''
-COINBASE_SECRET = ''
-COINBASE_EXCHANGE_API_KEY = ''
-COINBASE_EXCHANGE_API_SECRET = ''
-COINBASE_EXCHANGE_API_PASSPHRASE = ''
-
-# Creating a database user with permissions restricted to your cbtools database would be wise
-USER = 'cbtools'
-PASSWORD = 'PASSWORD'
-HOST = 'localhost'
-PORT = 5432
-DB = 'cbtools'
-
-URI = 'postgresql+psycopg2://{0}:{1}@{2}:{3}/{4}'.format(USER, PASSWORD, HOST, PORT, DB)
-```
+4. Get API keys from GDAX and Coinbase, add the environment variables mentioned in config.py
 
 5. Install the psycopg2, sqlalchemy, and coinbase Python packages
 

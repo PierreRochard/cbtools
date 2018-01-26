@@ -4,9 +4,9 @@ from sqlalchemy.engine.url import URL
 
 COINBASE_KEY = os.environ['COINBASE_KEY']
 COINBASE_SECRET = os.environ['COINBASE_SECRET']
-COINBASE_EXCHANGE_API_KEY = os.environ['COINBASE_EXCHANGE_API_KEY']
-COINBASE_EXCHANGE_API_SECRET = os.environ['COINBASE_EXCHANGE_API_SECRET']
-COINBASE_EXCHANGE_API_PASSPHRASE = os.environ['COINBASE_EXCHANGE_API_PASSPHRASE']
+GDAX_API_KEY = os.environ['GDAX_API_KEY']
+GDAX_API_SECRET = os.environ['GDAX_API_SECRET']
+GDAX_API_PASSPHRASE = os.environ['GDAX_API_PASSPHRASE']
 
 URI = URL(drivername='postgresql+psycopg2',
           username=os.environ['PGUSER'],
