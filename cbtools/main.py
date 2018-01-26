@@ -23,7 +23,7 @@ def get_wallet_data(wallet_client, refresh):
     if not os.path.exists(denested_json_file) or refresh:
         denested_jsons = []
         current_user = wallet_client.get_current_user()
-        denested_jsons += denest_json(current_user.json_doc)
+        denested_jsons += denest_json(current_user)
 
         wallet_accounts = wallet_client.get_accounts()
         denested_jsons += denest_json(wallet_accounts)
@@ -199,7 +199,7 @@ if __name__ == '__main__':
                       default=True, help='Load Coinbase Wallet Data into the database')
     ARGS.add_argument('--e', action='store_true', dest='exchange',
                       default=True, help='Load Coinbase Exchange Data into the database')
-    ARGS.add_argument('--r', action='store_true', dest='refresh', default=True, help='Refresh the data')
+    ARGS.add_argument('--r', action='store_true', dest='refresh', default=False, help='Refresh the data')
     args = ARGS.parse_args()
     tmp_directory = 'tmp/'
     if not os.path.exists(tmp_directory):
@@ -214,7 +214,7 @@ if __name__ == '__main__':
         from config import (COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET, COINBASE_EXCHANGE_API_PASSPHRASE)
         from cbtools.utilities import CoinbaseExchangeAuthentication
 
-        exchange_api_url = 'https://api.exchange.coinbase.com/'
+        exchange_api_url = 'https://api.gdax.com/'
         exchange_auth = CoinbaseExchangeAuthentication(COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET,
                                                        COINBASE_EXCHANGE_API_PASSPHRASE)
 

@@ -4,36 +4,15 @@ import traceback
 
 from sqlalchemy import create_engine, func, UniqueConstraint, Boolean
 from sqlalchemy import Column, DateTime, Integer, Numeric, String, ForeignKey
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker, synonym
 from sqlalchemy.ext.declarative import declarative_base
 
 from config import URI
 
 engine = create_engine(URI)
-
 session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-session.execute("CREATE SCHEMA IF NOT EXISTS cbtools;")
 Base = declarative_base()
 Base.query = session.query_property()
-
-
-class Accounts(Base):
-    __tablename__ = 'accounts'
-    __table_args__ = {"schema": "cbtools"}
-
-    balance_amount = Column(Numeric)
-    balance_currency = Column(String)
-    created_at = Column(DateTime(timezone=True))
-    currency = Column(String)
-    id = Column(String, primary_key=True)
-    name = Column(String)
-    native_balance_amount = Column(Numeric)
-    native_balance_currency = Column(String)
-    primary = Column(Boolean)
-    resource = Column(String)
-    resource_path = Column(String)
-    type = Column(String)
-    updated_at = Column(DateTime(timezone=True))
 
 
 class Addresses(Base):
@@ -46,9 +25,11 @@ class Addresses(Base):
     created_at = Column(DateTime(timezone=True))
     id = Column(String, primary_key=True)
     name = Column(String)
+    network = Column(String)
     resource = Column(String)
     resource_path = Column(String)
     updated_at = Column(DateTime(timezone=True))
+    uri_scheme = Column(String)
 
 
 class Exchanges(Base):
@@ -154,6 +135,10 @@ class PaymentMethods(Base):
     fiat_account_resource = Column(String)
     fiat_account_resource_path = Column(String)
     id = Column(String, primary_key=True)
+    instant_buy = Column(Boolean)
+    instant_sell = Column(Boolean)
+    limits_name = Column(String)
+    limits_type = Column(String)
     name = Column(String)
     primary_buy = Column(Boolean)
     primary_sell = Column(Boolean)
@@ -161,6 +146,7 @@ class PaymentMethods(Base):
     resource_path = Column(String)
     type = Column(String)
     updated_at = Column(DateTime(timezone=True))
+    verified = Column(Boolean)
 
 
 # class Refunds(Base):
@@ -236,6 +222,10 @@ class Users(Base):
     profile_url = Column(String)
     resource = Column(String)
     resource_path = Column(String)
+    state = Column(String)
+    tiers_completed = Column(String)
+    tiers_completed_description = Column(String)
+    tiers_total = Column(Integer)
     time_zone = Column(String)
     username = Column(String)
 
@@ -272,6 +262,7 @@ class Fills(Base):
     side = Column(String)
     size = Column(Numeric)
     trade_id = Column(Integer)
+    usd_volume = Column(Numeric)
     user_id = Column(String)
 
 
@@ -392,10 +383,12 @@ class SQLAlchemyLogHandler(logging.Handler):
 
 
 if __name__ == '__main__':
-    ARGS = argparse.ArgumentParser(description='Coinbase Exchange bot.')
+    ARGS = argparse.ArgumentParser()
     ARGS.add_argument('--d', action='store_true', dest='drop_tables', default=False, help='Drop tables')
     args = ARGS.parse_args()
 
+    session.execute("CREATE SCHEMA IF NOT EXISTS cbtools;")
+    session.commit()
     if args.drop_tables:
         Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)

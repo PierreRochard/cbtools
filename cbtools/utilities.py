@@ -2,7 +2,9 @@ import time
 import hmac
 import hashlib
 import base64
+from pprint import pformat
 
+from coinbase.wallet.model import Money
 from requests.auth import AuthBase
 
 
@@ -44,12 +46,16 @@ def denest_json(json_document, account_id=None, resource=None):
                                 new_limit['type'] = nested_key
                                 new_limit['payment_method_id'] = json_document['id']
                             new_json_documents += [new_limit]
-                    elif isinstance(nested_value, str) or isinstance(nested_value, bool) or nested_value is None:
+                    elif isinstance(nested_value, str) or isinstance(nested_value, bool) or isinstance(nested_value, int) or nested_value is None:
                         if nested_key == 'amount':
                             new_json_document[key] = nested_value
                         else:
                             new_key = key + '_' + nested_key
                             new_json_document[new_key] = nested_value
+                    elif isinstance(nested_value, Money):
+                        for subnested_key, subnested_value in nested_value.items():
+                            new_key = '_'.join([key, nested_key, subnested_key])
+                            new_json_document[new_key] = subnested_value
                     else:
                         print(type(nested_value))
                         raise Exception()

@@ -7,7 +7,7 @@ from cbtools.utilities import CoinbaseExchangeAuthentication
 from config import COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_PASSPHRASE, COINBASE_EXCHANGE_API_SECRET
 
 if __name__ == '__main__':
-    exchange_api_url = 'https://api.exchange.coinbase.com/'
+    exchange_api_url = 'https://api.gdax.com/'
     exchange_auth = CoinbaseExchangeAuthentication(COINBASE_EXCHANGE_API_KEY, COINBASE_EXCHANGE_API_SECRET,
                                                        COINBASE_EXCHANGE_API_PASSPHRASE)
 
